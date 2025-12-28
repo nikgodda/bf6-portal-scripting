@@ -1,6 +1,6 @@
-# BF6 Portal Mod Template
+# BF6 Portal Scripting
 
-This is the official starter template for creating Battlefield 6 Portal Mods using TypeScript.
+This is the tool for creating Battlefield 6 Portal Mods using TypeScript.
 
 It provides:
 
@@ -10,6 +10,9 @@ It provides:
 -   automatic merging into \_\_SCRIPT.ts
 -   automatic string generation into \_\_STRINGS.json
 -   integration with bf6-portal-mod-framework
+-   template gamemode
+-   example Pressure gamemode https://discord.com/channels/870246147455877181/1452903347618058501
+-   custom Bots Brain https://discord.com/channels/870246147455877181/1445614689823359066
 
 ---
 
