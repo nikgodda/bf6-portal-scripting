@@ -4700,111 +4700,6 @@ export const MAP_DATA: readonly MapDataDef[] = [
             },
         },
     },
-
-    /* {
-        map: mod.Maps.Granite_Marina,
-
-        initSectorId: 2,
-
-        capturePointFlags: {
-            1: mod.VoiceOverFlags.Alpha,
-            2: mod.VoiceOverFlags.Bravo,
-            3: mod.VoiceOverFlags.Charlie,
-            4: mod.VoiceOverFlags.Delta,
-            5: mod.VoiceOverFlags.Echo,
-            6: mod.VoiceOverFlags.Foxtrot,
-            7: mod.VoiceOverFlags.Golf,
-        },
-
-        teams: {
-            1: {
-                winCapturePointId: 5,
-                botCount: 2,
-            },
-            2: {
-                winCapturePointId: 1,
-                botCount: 3,
-            },
-        },
-
-        sectors: [
-            {
-                sectorId: 1,
-                bufferHQId: 11,
-                teams: {
-                    1: {
-                        capturePoints: {
-                            1: { hq: 111 },
-                        },
-                        nextSectorId: 2,
-                    },
-                    2: {
-                        capturePoints: {
-                            2: { hq: 221 },
-                        },
-                        nextSectorId: 1,
-                    },
-                },
-            },
-
-            {
-                sectorId: 2,
-                bufferHQId: 21,
-                teams: {
-                    1: {
-                        capturePoints: {
-                            2: { hq: 211 },
-                        },
-                        nextSectorId: 3,
-                    },
-                    2: {
-                        capturePoints: {
-                            3: { hq: 321 },
-                        },
-                        nextSectorId: 1,
-                    },
-                },
-            },
-
-            {
-                sectorId: 3,
-                bufferHQId: 3,
-                teams: {
-                    1: {
-                        capturePoints: {
-                            3: { hq: 311 },
-                        },
-                        nextSectorId: 4,
-                    },
-                    2: {
-                        capturePoints: {
-                            4: { hq: 421 },
-                        },
-                        nextSectorId: 2,
-                    },
-                },
-            },
-
-            {
-                sectorId: 4,
-                bufferHQId: 4,
-                teams: {
-                    1: {
-                        capturePoints: {
-                            4: { hq: 411 },
-                        },
-                        nextSectorId: 4,
-                    },
-                    2: {
-                        capturePoints: {
-                            5: { hq: 521 },
-                        },
-                        nextSectorId: 3,
-                    },
-                },
-            },
-        ],
-    }, */
 ]
 
 // -------- FILE: src\GameModes\Pressure\Map\MapDataService.ts --------
@@ -6134,13 +6029,49 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
     }
 }
 
+// -------- FILE: src\GameModes\TDM\Player\TDM_Player.ts --------
+export class TDM_Player extends CorePlayer_APlayer {
+    constructor(player: mod.Player) {
+        super(player)
+
+        this.addListener({
+            OnPlayerDeployed: () => {
+                mod.DisplayHighlightedWorldLogMessage(
+                    mod.Message(
+                        `gamemodes.TDM.playerDeployed`,
+                        mod.GetObjId(this.player)
+                    )
+                )
+            },
+        })
+    }
+}
+
+// -------- FILE: src\GameModes\TDM\Player\TDM_PlayerManager.ts --------
+export class TDM_PlayerManager extends CorePlayer_APlayerManager {
+    constructor() {
+        super(TDM_Player)
+    }
+}
+
+// -------- FILE: src\GameModes\TDM\TDM_GameMode.ts --------
+export class TDM_GameMode extends Core_AGameMode {
+    protected override createPlayerManager(): CorePlayer_APlayerManager {
+        return new TDM_PlayerManager()
+    }
+
+    protected override OnGameModeStarted(): void {
+        mod.DisplayNotificationMessage(mod.Message(`gamemodes.TDM.gamemodeStarted`))
+    }
+}
+
 // -------- FILE: src\GameModes\Template\Player\TPL_Player.ts --------
 export class TPL_Player extends CorePlayer_APlayer {
     constructor(player: mod.Player) {
         super(player)
 
         this.addListener({
-            OnPlayerDeployed: async () => {
+            OnPlayerDeployed: () => {
                 mod.DisplayHighlightedWorldLogMessage(
                     mod.Message(
                         `gamemodes.TPL.playerDeployed`,
@@ -6239,7 +6170,7 @@ export class TPL_GameMode extends Core_AGameMode {
  * separation between routing and gameplay code, unify PlayerManager access,
  * and ensure that custom game modes behave consistently with the engine rules.
  */
-const gameMode: Core_AGameMode = new PRSR_GameMode()
+const gameMode: Core_AGameMode = new TDM_GameMode()
 
 // This will trigger every engine tick while the gamemode is running.
 export function OngoingGlobal(): void {

@@ -105,6 +105,10 @@
     "TPL": {
       "playerDeployed": "Player Deployed: {}",
       "gamemodeStarted": "GameMode Started!"
+    },
+    "TDM": {
+      "playerDeployed": "Player Deployed: {}",
+      "gamemodeStarted": "GameMode Started!"
     }
   }
 }

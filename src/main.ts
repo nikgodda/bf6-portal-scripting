@@ -69,9 +69,10 @@
 
 import { Core_AGameMode } from './Core/AGameMode'
 import { PRSR_GameMode } from './GameModes/Pressure/PRSR_GameMode'
+import { TDM_GameMode } from './GameModes/TDM/TDM_GameMode'
 import { TPL_GameMode } from './GameModes/Template/TPL_GameMode'
 
-const gameMode: Core_AGameMode = new PRSR_GameMode()
+const gameMode: Core_AGameMode = new TDM_GameMode()
 
 // This will trigger every engine tick while the gamemode is running.
 export function OngoingGlobal(): void {
