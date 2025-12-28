@@ -1,6 +1,6 @@
 # BF6 Portal Scripting
 
-This is the tool for creating Battlefield 6 Portal Mods using TypeScript.
+This is the gameplay framework for Battlefield Portal scripting.
 
 It provides:
 
