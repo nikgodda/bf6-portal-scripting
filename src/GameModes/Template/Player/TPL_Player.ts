@@ -5,7 +5,7 @@ export class TPL_Player extends CorePlayer_APlayer {
         super(player)
 
         this.addListener({
-            OnPlayerDeployed: async () => {
+            OnPlayerDeployed: () => {
                 mod.DisplayHighlightedWorldLogMessage(
                     mod.Message(
                         `gamemodes.TPL.playerDeployed`,
