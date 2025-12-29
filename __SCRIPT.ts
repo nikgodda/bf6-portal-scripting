@@ -87,8 +87,8 @@ export interface CorePlayer_IPlayerEvents {
     OnLogicalPlayerJoinGame?(lp: CorePlayer_APlayer): void
 }
 
-// -------- FILE: src\Core\Player\Components\AI\PerisistentAIComponent.ts --------
-export class CorePlayer_PersistentAIComponent implements CorePlayer_IComponent {
+// -------- FILE: src\Core\Player\Components\AI\LogicalAIComponent.ts --------
+export class CorePlayer_LogicalAIComponent implements CorePlayer_IComponent {
     public soldierClass: mod.SoldierClass
     public displayName: mod.Message
     public spawner: mod.Spawner
@@ -154,18 +154,18 @@ export abstract class CorePlayer_APlayer {
         )
     }
 
-    isPersistentAI(): boolean {
-        return !!this.persistentAIComp
+    isLogicalAI(): boolean {
+        return !!this.logicalAIComp
     }
 
     /* ------------------------------------------------------------
      * Common component shortcuts
      * ------------------------------------------------------------ */
 
-    public get persistentAIComp():
-        | CorePlayer_PersistentAIComponent
+    public get logicalAIComp():
+        | CorePlayer_LogicalAIComponent
         | undefined {
-        return this.getComponent(CorePlayer_PersistentAIComponent)
+        return this.getComponent(CorePlayer_LogicalAIComponent)
     }
 
     /* ------------------------------------------------------------
@@ -666,7 +666,6 @@ export class CorePlayer_APlayerManager<
             teamId: number
             soldierClass: mod.SoldierClass
             displayName: mod.Message
-            isLogical: boolean
         }
     >()
 
@@ -676,11 +675,8 @@ export class CorePlayer_APlayerManager<
     ): void {
         const spawnerId = mod.GetObjId(eventSpawner)
         const entry = this.spawnerMap.get(spawnerId)
-        if (!entry) return
 
-        // Non-logical bot: engine-only AI
-        if (!entry.isLogical) {
-            this.spawnerMap.delete(spawnerId)
+        if (!entry) {
             return
         }
 
@@ -692,7 +688,7 @@ export class CorePlayer_APlayerManager<
 
             // Attach AI identity
             lp.addComponent(
-                new CorePlayer_PersistentAIComponent(
+                new CorePlayer_LogicalAIComponent(
                     entry.soldierClass,
                     entry.displayName,
                     eventSpawner
@@ -725,13 +721,12 @@ export class CorePlayer_APlayerManager<
      * Bot spawner API
      * ------------------------------------------------------------ */
 
-    public spawnBot(
+    public spawnLogicalBot(
         soldierClass: mod.SoldierClass,
         teamId: number,
         pos: mod.Vector,
         displayName: mod.Message,
         unspawnDelay: number,
-        isLogical: boolean = true,
         lp?: TPlayer
     ): void {
         const spawner = mod.SpawnObject(
@@ -750,7 +745,6 @@ export class CorePlayer_APlayerManager<
             teamId,
             soldierClass,
             displayName,
-            isLogical,
         })
 
         mod.SpawnAIFromAISpawner(
@@ -761,22 +755,21 @@ export class CorePlayer_APlayerManager<
         )
     }
 
-    public respawnBot(
+    public respawnLogicalBot(
         lp: TPlayer,
         spawnPos: mod.Vector,
         unspawnDelay: number
     ): void {
-        if (!lp.persistentAIComp) {
+        if (!lp.logicalAIComp) {
             return
         }
 
-        this.spawnBot(
-            lp.persistentAIComp.soldierClass,
+        this.spawnLogicalBot(
+            lp.logicalAIComp.soldierClass,
             lp.teamId,
             spawnPos,
-            lp.persistentAIComp.displayName,
+            lp.logicalAIComp.displayName,
             unspawnDelay,
-            true,
             lp
         )
     }
@@ -1730,56 +1723,6 @@ export abstract class Core_AGameMode<
     }
 }
 
-// -------- FILE: src\Core\Player\Components\Protection\ProtectionComponent.ts --------
-export class CorePlayer_ProtectionComponent implements CorePlayer_IComponent {
-    private ap!: CorePlayer_APlayer
-    private active: boolean = false
-    private deactivateAt: number = 0
-
-    onAttach(ap: CorePlayer_APlayer): void {
-        this.ap = ap
-
-        ap.addListener({
-            OngoingPlayer: () => {
-                if (!this.active) return
-
-                if (this.deactivateAt > 0 && Date.now() >= this.deactivateAt) {
-                    this.deactivate()
-                }
-            },
-        })
-    }
-
-    onDetach(ap: CorePlayer_APlayer): void {
-        this.active = false
-        this.deactivateAt = 0
-    }
-
-    activate(durationSec?: number): void {
-        this.active = true
-
-        mod.SetPlayerIncomingDamageFactor(this.ap.player, 0)
-
-        if (durationSec && durationSec > 0) {
-            this.deactivateAt = Date.now() + durationSec * 1000
-        } else {
-            this.deactivateAt = 0
-        }
-    }
-
-    deactivate(): void {
-        this.active = false
-        this.deactivateAt = 0
-
-        // BUG: setting 1 does NOT work
-        mod.SetPlayerIncomingDamageFactor(this.ap.player, 0.999)
-    }
-
-    isActive(): boolean {
-        return this.active
-    }
-}
-
 // -------- FILE: src\Core\Player\Components\BattleStats\BattleStatsComponent.ts --------
 export class CorePlayer_BattleStatsComponent implements CorePlayer_IComponent {
     private kills = 0
@@ -1865,463 +1808,63 @@ export class CorePlayer_BattleStatsComponent implements CorePlayer_IComponent {
     }
 }
 
-// -------- FILE: src\Core\Player\Components\Loadout\ALoadoutItem.ts --------
-// Abstract base class for all loadout items.
-// This defines common properties only and enforces valid inheritance.
-
-export abstract class CorePlayer_ALoadoutItem {
-    constructor(
-        public readonly slot: mod.InventorySlots,
-        public readonly name: string
-    ) {}
-}
-
-// -------- FILE: src\Core\Player\Components\Loadout\GadgetLoadoutItem.ts --------
-// Loadout item representing a gadget.
-
-
-export class CorePlayer_GadgetLoadoutItem extends CorePlayer_ALoadoutItem {
-    constructor(
-        slot: mod.InventorySlots,
-        name: string,
-        public readonly gadget: mod.Gadgets
-    ) {
-        super(slot, name)
-    }
-}
-
-// -------- FILE: src\Core\Player\Components\Loadout\IPlayerLoadout.ts --------
-// Minimal loadout definition used by the core loadout component.
-export interface CorePlayer_IPlayerLoadout {
-    id: string
-    items: CorePlayer_ALoadoutItem[]
-}
-
-// -------- FILE: src\Core\Player\Components\Loadout\WeaponLoadoutItem.ts --------
-// Loadout item representing a weapon with optional attachments.
-export class CorePlayer_WeaponLoadoutItem extends CorePlayer_ALoadoutItem {
-    constructor(
-        slot: mod.InventorySlots,
-        name: string,
-        public readonly weapon: mod.Weapons,
-        public readonly attachments: mod.WeaponAttachments[]
-    ) {
-        super(slot, name)
-    }
-}
-
-// -------- FILE: src\Core\Player\Components\Loadout\LoadoutComponent.ts --------
-// Core gameplay component responsible for applying loadouts.
-// UI, grouping, and availability are external concerns.
-export class CorePlayer_LoadoutComponent implements CorePlayer_IComponent {
+// -------- FILE: src\Core\Player\Components\Protection\ProtectionComponent.ts --------
+export class CorePlayer_ProtectionComponent implements CorePlayer_IComponent {
     private ap!: CorePlayer_APlayer
-    private currentLoadout: CorePlayer_IPlayerLoadout | null = null
+    private active: boolean = false
+    private deactivateAt: number = 0
 
     onAttach(ap: CorePlayer_APlayer): void {
         this.ap = ap
+
+        ap.addListener({
+            OngoingPlayer: () => {
+                if (!this.active) return
+
+                if (this.deactivateAt > 0 && Date.now() >= this.deactivateAt) {
+                    this.deactivate()
+                }
+            },
+        })
     }
 
-    onDetach(): void {}
-
-    applyLoadout(loadout: CorePlayer_IPlayerLoadout): void {
-        this.clearAllInventorySlots()
-
-        for (const item of loadout.items) {
-            this.applyItem(item)
-        }
-
-        this.currentLoadout = loadout
+    onDetach(ap: CorePlayer_APlayer): void {
+        this.active = false
+        this.deactivateAt = 0
     }
 
-    getCurrentLoadout(): CorePlayer_IPlayerLoadout | null {
-        return this.currentLoadout
-    }
+    activate(durationSec?: number): void {
+        this.active = true
 
-    // ----------------------------------
-    // Tested & trusted methods (unchanged)
-    // ----------------------------------
+        mod.SetPlayerIncomingDamageFactor(this.ap.player, 0)
 
-    public clearAllInventorySlots(): void {
-        const slots: mod.InventorySlots[] = [
-            mod.InventorySlots.PrimaryWeapon,
-            mod.InventorySlots.SecondaryWeapon,
-            mod.InventorySlots.GadgetOne,
-            mod.InventorySlots.GadgetTwo,
-            mod.InventorySlots.Throwable,
-        ]
-
-        for (const slot of slots) {
-            mod.RemoveEquipment(this.ap.player, slot)
+        if (durationSec && durationSec > 0) {
+            this.deactivateAt = Date.now() + durationSec * 1000
+        } else {
+            this.deactivateAt = 0
         }
     }
 
-    private applyItem(item: CorePlayer_ALoadoutItem): void {
-        if (item instanceof CorePlayer_WeaponLoadoutItem) {
-            const wp = mod.CreateNewWeaponPackage()
+    deactivate(): void {
+        this.active = false
+        this.deactivateAt = 0
 
-            for (const att of item.attachments) {
-                mod.AddAttachmentToWeaponPackage(att, wp)
-            }
+        // BUG: setting 1 does NOT work
+        mod.SetPlayerIncomingDamageFactor(this.ap.player, 0.999)
+    }
 
-            mod.AddEquipment(this.ap.player, item.weapon, wp, item.slot)
-        } else if (item instanceof CorePlayer_GadgetLoadoutItem) {
-            mod.AddEquipment(this.ap.player, item.gadget, item.slot)
-        }
+    isActive(): boolean {
+        return this.active
     }
 }
 
-// -------- FILE: src\GameModes\Pressure\Player\LoadoutsRegistry.ts --------
-export const enum LoadoutIdMap {
-    Assault_Operator = 'assault.operator',
-    Assault_Elite = 'assault.elite',
-    Support_Operator = 'support.operator',
-    Support_Elite = 'support.elite',
-    Rifleman_Operator = 'rifleman.operator',
-    Rifleman_Elite = 'rifleman.elite',
-    Sniper_Operator = 'sniper.operator',
-    Sniper_Elite = 'sniper.elite',
-}
-
-export class LoadoutsRegistry {
-    private static readonly loadouts: readonly CorePlayer_IPlayerLoadout[] = [
-        // --------------------------------------------------
-        // Assault Operator
-        // --------------------------------------------------
-        {
-            id: LoadoutIdMap.Assault_Operator,
-            items: [
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.PrimaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.AssaultRifle_L85A3,
-                    mod.Weapons.AssaultRifle_L85A3,
-                    [
-                        mod.WeaponAttachments.Scope_SDO_350x,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_518mm_Factory,
-                        mod.WeaponAttachments.Magazine_30rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.SecondaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.SMG_PW7A2,
-                    mod.Weapons.SMG_PW7A2,
-                    [
-                        mod.WeaponAttachments.Scope_RO_M_175x,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_180mm_Standard,
-                        mod.WeaponAttachments.Magazine_30rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_GadgetLoadoutItem(
-                    mod.InventorySlots.GadgetOne,
-                    mod.stringkeys.gamemodes.PRSR.loadout.gadgets.Launcher_High_Explosive,
-                    mod.Gadgets.Launcher_High_Explosive
-                ),
-            ],
-        },
-
-        // --------------------------------------------------
-        // Assault Elite
-        // --------------------------------------------------
-        {
-            id: LoadoutIdMap.Assault_Elite,
-            items: [
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.PrimaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.AssaultRifle_SOR_556_Mk2,
-                    mod.Weapons.AssaultRifle_SOR_556_Mk2,
-                    [
-                        mod.WeaponAttachments.Scope_PVQ_31_400x,
-                        mod.WeaponAttachments.Muzzle_Standard_Suppressor,
-                        mod.WeaponAttachments.Barrel_IAR_Heavy,
-                        mod.WeaponAttachments.Bottom_Slim_Angled,
-                        mod.WeaponAttachments.Magazine_30rnd_Fast_Mag,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.SecondaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.SMG_SGX,
-                    mod.Weapons.SMG_SGX,
-                    [
-                        mod.WeaponAttachments.Scope_SU_231_150x,
-                        mod.WeaponAttachments.Top_5_mW_Red,
-                        mod.WeaponAttachments.Right_Flashlight,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_6_Fluted,
-                        mod.WeaponAttachments.Magazine_41rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_GadgetLoadoutItem(
-                    mod.InventorySlots.GadgetOne,
-                    mod.stringkeys.gamemodes.PRSR.loadout.gadgets.Launcher_High_Explosive,
-                    mod.Gadgets.Launcher_High_Explosive
-                ),
-            ],
-        },
-
-        // --------------------------------------------------
-        // Support Operator
-        // --------------------------------------------------
-        {
-            id: LoadoutIdMap.Support_Operator,
-            items: [
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.PrimaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.LMG_L110,
-                    mod.Weapons.LMG_L110,
-                    [
-                        mod.WeaponAttachments.Scope_R4T_200x,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_349mm_SB,
-                        mod.WeaponAttachments.Bottom_Bipod,
-                        mod.WeaponAttachments.Magazine_100rnd_Belt_Pouch,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.SecondaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.Shotgun_M87A1,
-                    mod.Weapons.Shotgun_M87A1,
-                    [
-                        mod.WeaponAttachments.Scope_Iron_Sights,
-                        mod.WeaponAttachments.Barrel_20_Factory,
-                        mod.WeaponAttachments.Magazine_7_Shell_Tube,
-                        mod.WeaponAttachments.Ammo_Buckshot,
-                    ]
-                ),
-                new CorePlayer_GadgetLoadoutItem(
-                    mod.InventorySlots.Throwable,
-                    mod.stringkeys.gamemodes.PRSR.loadout.gadgets.Throwable_Smoke_Grenade,
-                    mod.Gadgets.Throwable_Smoke_Grenade
-                ),
-            ],
-        },
-
-        // --------------------------------------------------
-        // Support Elite
-        // --------------------------------------------------
-        {
-            id: LoadoutIdMap.Support_Elite,
-            items: [
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.PrimaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.LMG_M240L,
-                    mod.Weapons.LMG_M240L,
-                    [
-                        mod.WeaponAttachments.Scope_SU_231_150x,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_20_OH,
-                        mod.WeaponAttachments.Bottom_Bipod,
-                        mod.WeaponAttachments.Magazine_75rnd_Belt_Box,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.SecondaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.Shotgun_M1014,
-                    mod.Weapons.Shotgun_M1014,
-                    [
-                        mod.WeaponAttachments.Scope_SU_231_150x,
-                        mod.WeaponAttachments.Barrel_185_Factory,
-                        mod.WeaponAttachments.Bottom_Slim_Angled,
-                        mod.WeaponAttachments.Magazine_6_Shell_Tube,
-                        mod.WeaponAttachments.Ammo_Buckshot,
-                    ]
-                ),
-                new CorePlayer_GadgetLoadoutItem(
-                    mod.InventorySlots.Throwable,
-                    mod.stringkeys.gamemodes.PRSR.loadout.gadgets.Throwable_Smoke_Grenade,
-                    mod.Gadgets.Throwable_Smoke_Grenade
-                ),
-            ],
-        },
-
-        // --------------------------------------------------
-        // Rifleman Operator
-        // --------------------------------------------------
-        {
-            id: LoadoutIdMap.Rifleman_Operator,
-            items: [
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.PrimaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.DMR_M39_EMR,
-                    mod.Weapons.DMR_M39_EMR,
-                    [
-                        mod.WeaponAttachments.Scope_PVQ_31_400x,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_18_EBR,
-                        mod.WeaponAttachments.Magazine_20rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.SecondaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.Carbine_M4A1,
-                    mod.Weapons.Carbine_M4A1,
-                    [
-                        mod.WeaponAttachments.Scope_SU_231_150x,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_115_Commando,
-                        mod.WeaponAttachments.Magazine_30rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_GadgetLoadoutItem(
-                    mod.InventorySlots.Throwable,
-                    mod.stringkeys.gamemodes.PRSR.loadout.gadgets.Throwable_Stun_Grenade,
-                    mod.Gadgets.Throwable_Stun_Grenade
-                ),
-            ],
-        },
-
-        // --------------------------------------------------
-        // Rifleman Elite
-        // --------------------------------------------------
-        {
-            id: LoadoutIdMap.Rifleman_Elite,
-            items: [
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.PrimaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.DMR_SVDM,
-                    mod.Weapons.DMR_SVDM,
-                    [
-                        mod.WeaponAttachments.Scope_PVQ_31_400x,
-                        mod.WeaponAttachments.Top_5_mW_Red,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_550mm_Factory,
-                        mod.WeaponAttachments.Bottom_Slim_Angled,
-                        mod.WeaponAttachments.Magazine_10rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.SecondaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.Carbine_GRT_BC,
-                    mod.Weapons.Carbine_GRT_BC,
-                    [
-                        mod.WeaponAttachments.Scope_SU_231_150x,
-                        mod.WeaponAttachments.Right_Flashlight,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_145_Alt,
-                        mod.WeaponAttachments.Magazine_40rnd_Fast_Mag,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_GadgetLoadoutItem(
-                    mod.InventorySlots.Throwable,
-                    mod.stringkeys.gamemodes.PRSR.loadout.gadgets.Throwable_Stun_Grenade,
-                    mod.Gadgets.Throwable_Stun_Grenade
-                ),
-            ],
-        },
-
-        // --------------------------------------------------
-        // Sniper Operator
-        // --------------------------------------------------
-        {
-            id: LoadoutIdMap.Sniper_Operator,
-            items: [
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.PrimaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.Sniper_M2010_ESR,
-                    mod.Weapons.Sniper_M2010_ESR,
-                    [
-                        mod.WeaponAttachments.Scope_S_VPS_600x,
-                        mod.WeaponAttachments.Muzzle_Single_port_Brake,
-                        mod.WeaponAttachments.Barrel_24_Fluted,
-                        mod.WeaponAttachments.Magazine_5rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.SecondaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.Sidearm_M45A1,
-                    mod.Weapons.Sidearm_M45A1,
-                    [
-                        mod.WeaponAttachments.Scope_Iron_Sights,
-                        mod.WeaponAttachments.Barrel_5_Factory,
-                        mod.WeaponAttachments.Magazine_7rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_GadgetLoadoutItem(
-                    mod.InventorySlots.GadgetOne,
-                    mod.stringkeys.gamemodes.PRSR.loadout.gadgets.Misc_Sniper_Decoy,
-                    mod.Gadgets.Misc_Sniper_Decoy
-                ),
-            ],
-        },
-
-        // --------------------------------------------------
-        // Sniper Elite
-        // --------------------------------------------------
-        {
-            id: LoadoutIdMap.Sniper_Elite,
-            items: [
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.PrimaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.Sniper_PSR,
-                    mod.Weapons.Sniper_PSR,
-                    [
-                        mod.WeaponAttachments.Scope_NFX_800x,
-                        mod.WeaponAttachments.Top_5_mW_Red,
-                        mod.WeaponAttachments.Muzzle_Double_port_Brake,
-                        mod.WeaponAttachments.Barrel_27_MK22,
-                        mod.WeaponAttachments.Bottom_Bipod,
-                        mod.WeaponAttachments.Magazine_10rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.SecondaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.Sidearm_P18,
-                    mod.Weapons.Sidearm_P18,
-                    [
-                        mod.WeaponAttachments.Scope_Mini_Flex_100x,
-                        mod.WeaponAttachments.Barrel_39_Factory,
-                        mod.WeaponAttachments.Top_5_mW_Red,
-                        mod.WeaponAttachments.Magazine_17rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_GadgetLoadoutItem(
-                    mod.InventorySlots.GadgetOne,
-                    mod.stringkeys.gamemodes.PRSR.loadout.gadgets.Misc_Sniper_Decoy,
-                    mod.Gadgets.Misc_Sniper_Decoy
-                ),
-            ],
-        },
-    ]
-
-    static getAll(): readonly CorePlayer_IPlayerLoadout[] {
-        return this.loadouts
-    }
-
-    static getById(id: LoadoutIdMap): CorePlayer_IPlayerLoadout | null {
-        for (const loadout of this.loadouts) {
-            if (loadout.id === id) {
-                return loadout
-            }
-        }
-        return null
-    }
-}
-
-// -------- FILE: src\GameModes\Pressure\Player\Player.ts --------
-export class Player extends CorePlayer_APlayer {
-    loadoutComp: CorePlayer_LoadoutComponent
+// -------- FILE: src\GameModes\TDM\Player\TDM_Player.ts --------
+export class TDM_Player extends CorePlayer_APlayer {
     protectionComp: CorePlayer_ProtectionComponent
     battleStatsComp: CorePlayer_BattleStatsComponent
 
     constructor(player: mod.Player) {
         super(player)
-
-        this.loadoutComp = new CorePlayer_LoadoutComponent()
-        this.addComponent(this.loadoutComp)
 
         this.protectionComp = new CorePlayer_ProtectionComponent()
         this.addComponent(this.protectionComp)
@@ -2329,82 +1872,21 @@ export class Player extends CorePlayer_APlayer {
         this.battleStatsComp = new CorePlayer_BattleStatsComponent()
         this.addComponent(this.battleStatsComp)
 
-        // React explicitly to loadout selection
-        /* this.loadoutComp.onLoadoutSelected(() => {
-            if (this.deployReturnPos) {
-                mod.Teleport(this.player, this.deployReturnPos, 0)
-                this.deployReturnPos = null
-            }
-
-            this.loadoutComp.hideDeployUI()
-            this.protectionComp.activate(5)
-        }) */
-
         this.addListener({
-            OnPlayerDeployed: async () => {
-                /* await mod.Wait(3)
-                mod.PlaySound(
-                    mod.SpawnObject(mod.RuntimeSpawn_Common.closed)
-                ) */
-
-                // loadout
-                const ids = [
-                    LoadoutIdMap.Assault_Operator,
-                    LoadoutIdMap.Support_Operator,
-                    LoadoutIdMap.Rifleman_Operator,
-                    LoadoutIdMap.Sniper_Operator,
-                ]
-                const randomId = ids[Math.floor(Math.random() * ids.length)]
-
-                const loadout = LoadoutsRegistry.getById(randomId)
-
-                if (loadout) {
-                    this.loadoutComp.applyLoadout(loadout)
-                }
-
-                // spawn protection
+            OnPlayerDeployed: () => {
                 this.protectionComp.activate(5)
-
-                // stats
                 this.battleStatsComp.clearKillStreak()
-
-                // BUG: no effect at all
-                // mod.SkipManDown(this.player, true)
-
-                // mod.SetPlayerMovementSpeedMultiplier(this.player, 2)
-
-                /*  await mod.Wait(3)
-                mod.DisplayHighlightedWorldLogMessage(mod.Message(132))
-                mod.PlayVO(
-                    mod.SpawnObject(
-                        mod.RuntimeSpawn_Common.SFX_VOModule_OneShot2D,
-                        mod.CreateVector(0, 0, 0),
-                        mod.CreateVector(0, 0, 0)
-                    ),
-                    // mod.VoiceOverEvents2D.ObjectiveCaptured, // we own objective Golf
-                    // mod.VoiceOverEvents2D.ObjectiveCapturedEnemy, // hostiles now control objective Golf
-                    // mod.VoiceOverEvents2D.ObjectiveCapturedEnemyGeneric, // BUG: silence
-                    // mod.VoiceOverEvents2D.ObjectiveCapturedGeneric, // BUG: silence
-                    // mod.VoiceOverEvents2D.ObjectiveCapturing, // BUG: securing ALPHA (always)
-                    // mod.VoiceOverEvents2D.ObjectiveContested, // hostiles are attacking Golf
-                    // mod.VoiceOverEvents2D.ObjectiveLocated, // new objective located
-                    // mod.VoiceOverEvents2D.ObjectiveLockdownEnemy, // Golf has been locked down by the enemy
-                    // mod.VoiceOverEvents2D.ObjectiveLockdownFriendly, // our forces have locked down Golf
-                    // mod.VoiceOverEvents2D.ObjectiveLost, // we've lost control of the objective Golf
-                    // mod.VoiceOverEvents2D.ObjectiveNeutralised, // our forces neutralized Golf
-                    mod.VoiceOverEvents2D.SectorTakenAttacker, // attack successful. we've taken enemy sector
-                    mod.VoiceOverFlags.Golf
-                ) */
             },
 
-            OnPlayerDied: async () => {
+            OnPlayerDied: () => {
                 this.battleStatsComp.addDeath()
 
-                await mod.Wait(0.1)
-                mod.Kill(this.player)
+                mod.Wait(0.1).then(() => {
+                    mod.Kill(this.player)
+                })
             },
 
-            OnPlayerEarnedKill: async (
+            OnPlayerEarnedKill: (
                 eventOtherPlayer,
                 eventDeathType,
                 eventWeaponUnlock
@@ -2431,49 +1913,7 @@ export class Player extends CorePlayer_APlayer {
                 }
             },
 
-            OnPlayerUndeploy: () => {
-                /* mod.SetTeam(
-                    this.player,
-                    this.teamId === 1 ? mod.GetTeam(2) : mod.GetTeam(1)
-                ) */
-            },
-
-            OnPlayerInteract: (eventInteractPoint) => {
-                const ids = [
-                    LoadoutIdMap.Assault_Elite,
-                    LoadoutIdMap.Support_Elite,
-                    LoadoutIdMap.Rifleman_Elite,
-                    LoadoutIdMap.Sniper_Elite,
-                ]
-                const randomId = ids[Math.floor(Math.random() * ids.length)]
-
-                const loadout = LoadoutsRegistry.getById(randomId)
-
-                if (loadout) {
-                    this.loadoutComp.applyLoadout(loadout)
-
-                    mod.ForceSwitchInventory(
-                        this.player,
-                        mod.InventorySlots.PrimaryWeapon
-                    )
-                }
-            },
-
-            OnPlayerDamaged: () => {
-                /* mod.PlaySound(
-                    mod.SpawnObject(
-                        mod.RuntimeSpawn_Common
-                            .SFX_Soldier_Damage_ArmorDamage_Enemy_OneShot2D,
-                        mod.GetObjectPosition(this.player),
-                        mod.CreateVector(0, 0, 0)
-                    ),
-                    10,
-                    mod.GetObjectPosition(this.player),
-                    100
-                ) */
-            },
-
-            OngoingPlayer: async () => {
+            OngoingPlayer: () => {
                 if (!mod.IsPlayerValid(this.player)) {
                     return
                 }
@@ -2486,40 +1926,15 @@ export class Player extends CorePlayer_APlayer {
                     this.battleStatsComp.getTeamKills(),
                     this.battleStatsComp.getKillStreak()
                 )
-
-                if (
-                    mod.GetSoldierState(
-                        this.player,
-                        mod.SoldierStateBool.IsAlive
-                    ) &&
-                    mod.GetSoldierState(
-                        this.player,
-                        mod.SoldierStateBool.IsFiring
-                    )
-                ) {
-                    if (
-                        mod.IsInventorySlotActive(
-                            this.player,
-                            mod.InventorySlots.ClassGadget
-                        ) &&
-                        mod.HasEquipment(
-                            this.player,
-                            mod.Gadgets.Class_Adrenaline_Injector
-                        )
-                    ) {
-                        await mod.Wait(1)
-                        mod.Heal(this.player, 100)
-                    }
-                }
             },
         })
     }
 }
 
-// -------- FILE: src\GameModes\Pressure\Player\PlayerManager.ts --------
-export class PlayerManager extends CorePlayer_APlayerManager {
+// -------- FILE: src\GameModes\TDM\Player\TDM_PlayerManager.ts --------
+export class TDM_PlayerManager extends CorePlayer_APlayerManager {
     constructor() {
-        super(Player)
+        super(TDM_Player)
     }
 }
 
@@ -2953,6 +2368,44 @@ export class CoreAI_BehaviorController {
         this.current = new CoreAI_IdleBehavior(this.brain)
         this.current.enter()
     }
+}
+
+// -------- FILE: src\Core\AI\Modules\Task\ITaskScoringEntry.ts --------
+// src/Core/AI/Modules/Task/ITaskScoringEntry.ts
+/**
+ * CoreAI_ITaskScoringEntry:
+ * - score(brain): returns utility score for this behavior.
+ * - factory(brain): creates a ready-to-run behavior instance.
+ *
+ * TaskSelector:
+ * - picks the entry with highest score
+ * - calls factory(brain) to get the behavior instance
+ */
+export interface CoreAI_ITaskScoringEntry {
+    score: (brain: CoreAI_Brain) => number
+    factory: (brain: CoreAI_Brain) => CoreAI_ABehavior
+}
+
+// -------- FILE: src\Core\AI\Profiles\AProfile.ts --------
+/**
+ * CoreAI_AProfile:
+ * Base AI profile.
+ *
+ * Contains:
+ *  - scoring: list of behavior scoring entries
+ *  - sensors: list of sensor factory functions
+ *
+ * Each sensor factory returns a new sensor instance:
+ *    () => new SomeSensor(...)
+ *
+ * This ensures every AI brain receives fresh, isolated sensors.
+ */
+export abstract class CoreAI_AProfile {
+    /** Task scoring table for behaviors. */
+    scoring: CoreAI_ITaskScoringEntry[] = []
+
+    /** Sensor factories. Each returns a new CoreAI_ASensor instance. */
+    sensors: (() => CoreAI_ASensor)[] = []
 }
 
 // -------- FILE: src\Core\AI\Modules\Task\TaskSelector.ts --------
@@ -3475,44 +2928,6 @@ export class CoreAI_Brain {
             }
         }
     }
-}
-
-// -------- FILE: src\Core\AI\Modules\Task\ITaskScoringEntry.ts --------
-// src/Core/AI/Modules/Task/ITaskScoringEntry.ts
-/**
- * CoreAI_ITaskScoringEntry:
- * - score(brain): returns utility score for this behavior.
- * - factory(brain): creates a ready-to-run behavior instance.
- *
- * TaskSelector:
- * - picks the entry with highest score
- * - calls factory(brain) to get the behavior instance
- */
-export interface CoreAI_ITaskScoringEntry {
-    score: (brain: CoreAI_Brain) => number
-    factory: (brain: CoreAI_Brain) => CoreAI_ABehavior
-}
-
-// -------- FILE: src\Core\AI\Profiles\AProfile.ts --------
-/**
- * CoreAI_AProfile:
- * Base AI profile.
- *
- * Contains:
- *  - scoring: list of behavior scoring entries
- *  - sensors: list of sensor factory functions
- *
- * Each sensor factory returns a new sensor instance:
- *    () => new SomeSensor(...)
- *
- * This ensures every AI brain receives fresh, isolated sensors.
- */
-export abstract class CoreAI_AProfile {
-    /** Task scoring table for behaviors. */
-    scoring: CoreAI_ITaskScoringEntry[] = []
-
-    /** Sensor factories. Each returns a new CoreAI_ASensor instance. */
-    sensors: (() => CoreAI_ASensor)[] = []
 }
 
 // -------- FILE: src\Core\AI\Modules\Behavior\Behaviors\FightBehavior.ts --------
@@ -4528,1257 +3943,24 @@ export class Core_SquadManager {
     }
 }
 
-// -------- FILE: src\GameModes\Pressure\Map\MapData.ts --------
-// --------------------------------------------------
-// WP helpers (pure data)
-// --------------------------------------------------
-
-export interface WpIdRange {
-    from: number
-    to: number
-}
-
-// --------------------------------------------------
-// Capture point definitions
-// --------------------------------------------------
-
-export interface SectorTeamCapturePointDef {
-    hq: number
-}
-
-// --------------------------------------------------
-// Sector definitions
-// --------------------------------------------------
-
-export interface SectorTeamDef {
-    nextSectorId: number
-
-    capturePoints: {
-        [capturePointId: string]: SectorTeamCapturePointDef
-    }
-}
-
-export interface SectorDef {
-    bufferHQId: number
-    teams: {
-        [teamId: number]: SectorTeamDef
-    }
-}
-
-// --------------------------------------------------
-// Map-level data
-// --------------------------------------------------
-
-export interface MapTeamDef {
-    winCapturePointId: number
-    botCount: number
-}
-
-export interface MapDataDef {
-    map: mod.Maps
-    initSectorId: number
-    capturePointFlags: {
-        [capturePointId: number]: mod.VoiceOverFlags
-    }
-    teams: {
-        [teamId: string]: MapTeamDef
+// -------- FILE: src\GameModes\TDM\TDM_GameMode.ts --------
+export class TDM_GameMode extends Core_AGameMode {
+    protected override createPlayerManager(): CorePlayer_APlayerManager {
+        return new TDM_PlayerManager()
     }
 
-    sectors: {
-        [sectorId: number]: SectorDef
-    }
-}
-
-// --------------------------------------------------
-// Map data
-// --------------------------------------------------
-
-export const MAP_DATA: readonly MapDataDef[] = [
-    {
-        map: mod.Maps.Abbasid,
-        initSectorId: 2,
-
-        capturePointFlags: {
-            1: mod.VoiceOverFlags.Alpha,
-            2: mod.VoiceOverFlags.Bravo,
-            3: mod.VoiceOverFlags.Charlie,
-            4: mod.VoiceOverFlags.Delta,
-            5: mod.VoiceOverFlags.Echo,
-            6: mod.VoiceOverFlags.Foxtrot,
-            7: mod.VoiceOverFlags.Golf,
-            8: mod.VoiceOverFlags.Alpha,
-        },
-
-        teams: {
-            1: {
-                winCapturePointId: 8,
-                botCount: 9,
-            },
-            2: {
-                winCapturePointId: 1,
-                botCount: 10,
-            },
-        },
-
-        sectors: {
-            1: {
-                bufferHQId: 1,
-                teams: {
-                    1: {
-                        capturePoints: {
-                            1: { hq: 111 },
-                        },
-                        nextSectorId: 2,
-                    },
-                    2: {
-                        capturePoints: {
-                            2: { hq: 221 },
-                            3: { hq: 321 },
-                        },
-                        nextSectorId: 1,
-                    },
-                },
-            },
-
-            2: {
-                bufferHQId: 2,
-                teams: {
-                    1: {
-                        capturePoints: {
-                            2: { hq: 211 },
-                            3: { hq: 311 },
-                        },
-                        nextSectorId: 3,
-                    },
-                    2: {
-                        capturePoints: {
-                            4: { hq: 421 },
-                            5: { hq: 521 },
-                        },
-                        nextSectorId: 1,
-                    },
-                },
-            },
-
-            3: {
-                bufferHQId: 3,
-                teams: {
-                    1: {
-                        capturePoints: {
-                            4: { hq: 411 },
-                            5: { hq: 511 },
-                        },
-                        nextSectorId: 4,
-                    },
-                    2: {
-                        capturePoints: {
-                            6: { hq: 621 },
-                            7: { hq: 721 },
-                        },
-                        nextSectorId: 2,
-                    },
-                },
-            },
-
-            4: {
-                bufferHQId: 4,
-                teams: {
-                    1: {
-                        capturePoints: {
-                            6: { hq: 611 },
-                            7: { hq: 711 },
-                        },
-                        nextSectorId: 4,
-                    },
-                    2: {
-                        capturePoints: {
-                            8: { hq: 821 },
-                        },
-                        nextSectorId: 3,
-                    },
-                },
-            },
-        },
-    },
-]
-
-// -------- FILE: src\GameModes\Pressure\Map\MapDataService.ts --------
-// --------------------------------------------------
-// Runtime indexed data
-// --------------------------------------------------
-
-interface RuntimeSector {
-    def: SectorDef
-    teams: Map<number, SectorTeamDef>
-}
-
-interface RuntimeMapData {
-    map: mod.Maps
-    initSectorId: number
-    capturePointFlags: Map<number, mod.VoiceOverFlags>
-    teams: Map<number, { winCapturePointId: number; botCount: number }>
-    sectors: Map<number, RuntimeSector>
-}
-
-// --------------------------------------------------
-// Service
-// --------------------------------------------------
-
-export class MapDataService {
-    private readonly data: RuntimeMapData
-
-    // --------------------------------------------------
-    // Construction
-    // --------------------------------------------------
-
-    constructor() {
-        // BUG: mod.IsCurrentMap(d.map) works locally ONLY
-        // const found = MAP_DATA.find((d) => mod.IsCurrentMap(d.map))
-        const found = MAP_DATA[0]
-
-        if (!found) {
-            throw new Error('No map data for current map')
-        }
-
-        this.data = this.index(found)
-    }
-
-    // --------------------------------------------------
-    // Indexing (structural only)
-    // --------------------------------------------------
-
-    private index(def: MapDataDef): RuntimeMapData {
-        const capturePointFlags = new Map<number, mod.VoiceOverFlags>()
-        for (const cpIdStr of Object.keys(def.capturePointFlags)) {
-            capturePointFlags.set(
-                Number(cpIdStr),
-                def.capturePointFlags[Number(cpIdStr)]
-            )
-        }
-
-        const teams = new Map<
-            number,
-            { winCapturePointId: number; botCount: number }
-        >()
-        for (const teamIdStr of Object.keys(def.teams)) {
-            teams.set(Number(teamIdStr), def.teams[Number(teamIdStr)])
-        }
-
-        const sectors = new Map<number, RuntimeSector>()
-        for (const sectorIdStr of Object.keys(def.sectors)) {
-            const sectorId = Number(sectorIdStr)
-            const sectorDef = def.sectors[sectorId]
-
-            const sectorTeams = new Map<number, SectorTeamDef>()
-            for (const teamIdStr of Object.keys(sectorDef.teams)) {
-                sectorTeams.set(
-                    Number(teamIdStr),
-                    sectorDef.teams[Number(teamIdStr)]
-                )
-            }
-
-            sectors.set(sectorId, {
-                def: sectorDef,
-                teams: sectorTeams,
-            })
-        }
-
-        return {
-            map: def.map,
-            initSectorId: def.initSectorId,
-            capturePointFlags,
-            teams,
-            sectors,
-        }
-    }
-
-    // --------------------------------------------------
-    // Map-level metadata API
-    // --------------------------------------------------
-
-    getInitSectorId(): number {
-        return this.data.initSectorId
-    }
-
-    getAllSectorIds(): number[] {
-        return Array.from(this.data.sectors.keys())
-    }
-
-    getAllCapturePointIds(): number[] {
-        return Array.from(this.data.capturePointFlags.keys())
-    }
-
-    getBotCount(teamId: number): number {
-        const team = this.data.teams.get(teamId)
-        if (!team) {
-            throw new Error('No team data for team ' + teamId)
-        }
-        return team.botCount
-    }
-
-    getWinCapturePointId(teamId: number): number {
-        const team = this.data.teams.get(teamId)
-        if (!team) {
-            throw new Error('No team data for team ' + teamId)
-        }
-        return team.winCapturePointId
-    }
-
-    // This checks whether a team currently owns all capture points in a sector.
-
-    doesTeamControlEntireSector(sectorId: number, teamId: number): boolean {
-        const cps = this.getAllCapturePointsInSector(sectorId)
-
-        for (const cp of cps) {
-            const ownerTeam = mod.GetCurrentOwnerTeam(cp)
-
-            if (mod.GetObjId(ownerTeam) !== teamId) {
-                return false
-            }
-        }
-
-        return true
-    }
-
-    // This checks whether a team controls the frontline of a sector,
-    // meaning all capture points assigned to other teams are owned by this team.
-
-    // BUG: currently mod.SetCapturePointOwner is not working. Cant effectively set previous sector Capture Points owner
-
-    doesTeamControlFrontline(sectorId: number, teamId: number): boolean {
-        const sector = this.getSector(sectorId)
-        const enemyCpIds = new Set<number>()
-
-        for (const [otherTeamId, teamDef] of sector.teams.entries()) {
-            if (otherTeamId === teamId) continue
-
-            for (const cpIdStr of Object.keys(teamDef.capturePoints)) {
-                enemyCpIds.add(Number(cpIdStr))
-            }
-        }
-
-        for (const cpId of enemyCpIds) {
-            const cp = mod.GetCapturePoint(cpId)
-            const ownerTeam = mod.GetCurrentOwnerTeam(cp)
-
-            if (!ownerTeam || mod.GetObjId(ownerTeam) !== teamId) {
-                return false
-            }
-        }
-
-        return true
-    }
-
-    // --------------------------------------------------
-    // Capture point metadata API
-    // --------------------------------------------------
-
-    getFlagForCapturePoint(cpId: number): mod.VoiceOverFlags | null {
-        return this.data.capturePointFlags.get(cpId) ?? null
-    }
-
-    // --------------------------------------------------
-    // Sector metadata API
-    // --------------------------------------------------
-
-    getSectorBufferHQId(sectorId: number): number | null {
-        return this.getSector(sectorId).def.bufferHQId
-    }
-
-    getNextSectorId(sectorId: number, teamId: number): number | null {
-        return this.getSectorTeam(sectorId, teamId).nextSectorId ?? null
-    }
-
-    // --------------------------------------------------
-    // AI helpers
-    // --------------------------------------------------
-
-    /* getRoamWPs(sectorId: number, player: mod.Player): mod.Vector[] {
-        const pos = this.getClosestEnemyCapturePointPosition(sectorId, player)
-
-        if (!pos) {
-            return [mod.GetObjectPosition(player)]
-        }
-        return [pos]
-    }
-
-    getDefendWPs(sectorId: number, player: mod.Player): mod.Vector[] {
-        const pos = this.getClosestEnemyCapturePointPosition(sectorId, player)
-
-        if (!pos) {
-            return [mod.GetObjectPosition(player)]
-        }
-        return [pos]
-    } */
-
-    getBotSpawnPos(sectorId: number, teamId: number): mod.Vector {
-        const team = this.getSectorTeam(sectorId, teamId)
-        const cpIds = Object.keys(team.capturePoints).map(Number)
-
-        if (cpIds.length === 0) {
-            throw new Error(
-                'No capture points for team ' +
-                    teamId +
-                    ' in sector ' +
-                    sectorId
-            )
-        }
-
-        const cpId = cpIds[Math.floor(Math.random() * cpIds.length)]
-        const hq = mod.GetHQ(team.capturePoints[cpId].hq)
-
-        return mod.GetObjectPosition(hq)
-    }
-
-    // --------------------------------------------------
-    // Objective control (engine mutation)
-    // --------------------------------------------------
-
-    enableSector(sectorId: number): void {
-        const sector = this.getSector(sectorId)
-
-        mod.EnableGameModeObjective(mod.GetSector(sectorId), true)
-
-        for (const team of sector.teams.values()) {
-            for (const cpIdStr of Object.keys(team.capturePoints)) {
-                const cpId = Number(cpIdStr)
-                const cp = mod.GetCapturePoint(cpId)
-
-                mod.EnableGameModeObjective(cp, true)
-                mod.EnableCapturePointDeploying(cp, false)
-
-                const hq = mod.GetHQ(team.capturePoints[cpId].hq)
-                if (hq) {
-                    mod.EnableHQ(hq, true)
-                }
-            }
-        }
-    }
-
-    disableSector(sectorId: number, attackingTeamId?: number): void {
-        const sector = this.getSector(sectorId)
-
-        for (const team of sector.teams.values()) {
-            for (const cpIdStr of Object.keys(team.capturePoints)) {
-                const cpId = Number(cpIdStr)
-                const cp = mod.GetCapturePoint(cpId)
-
-                if (attackingTeamId !== undefined) {
-                    mod.SetCapturePointOwner(cp, mod.GetTeam(attackingTeamId))
-                }
-
-                mod.EnableGameModeObjective(cp, false)
-                mod.EnableHQ(mod.GetHQ(team.capturePoints[cpId].hq), false)
-            }
-        }
-
-        mod.EnableGameModeObjective(mod.GetSector(sectorId), false)
-    }
-
-    disableAllSectors(): void {
-        for (const sectorId of this.data.sectors.keys()) {
-            this.disableSector(sectorId)
-        }
-    }
-
-    // --------------------------------------------------
-    // Internal helpers
-    // --------------------------------------------------
-
-    private getSector(sectorId: number): RuntimeSector {
-        const sector = this.data.sectors.get(sectorId)
-        if (!sector) {
-            throw new Error('Sector not found: ' + sectorId)
-        }
-        return sector
-    }
-
-    private getSectorTeam(sectorId: number, teamId: number): SectorTeamDef {
-        const team = this.getSector(sectorId).teams.get(teamId)
-        if (!team) {
-            throw new Error('No team ' + teamId + ' in sector ' + sectorId)
-        }
-        return team
-    }
-
-    // Returns all unique capture point ids that belong to a sector.
-
-    public getAllCapturePointsInSector(sectorId: number): mod.CapturePoint[] {
-        const sector = this.getSector(sectorId)
-        const cps = new Set<mod.CapturePoint>()
-
-        for (const team of sector.teams.values()) {
-            for (const cpId of Object.keys(team.capturePoints)) {
-                cps.add(mod.GetCapturePoint(+cpId))
-            }
-        }
-
-        return [...cps]
-    }
-
-    private resolveWpRange(range: WpIdRange): mod.Vector[] {
-        const out: mod.Vector[] = []
-
-        for (let id = range.from; id <= range.to; id++) {
-            const wp = mod.GetSpatialObject(id)
-            out.push(mod.GetObjectPosition(wp))
-        }
-
-        return out
-    }
-}
-
-// -------- FILE: src\GameModes\Pressure\IGameModeEvents.ts --------
-/*
- * Pressure-specific GameMode events.
- *
- * Extends core GameMode events without modifying Core.
- * Only PRSR_GameMode is allowed to emit these.
- */
-export interface IGameModeEvents extends CorePlayer_IGameModeEngineEvents {
-    OnSectorChanged?(
-        currentSectorId: number,
-        previousSectorId: number,
-        teamId: number,
-        bufferTime: number
-    ): void
-
-    OnCapturePointCapturedResolved?(eventCapturePoint: mod.CapturePoint): void
-}
-
-// -------- FILE: src\GameModes\Pressure\Services\VOService.ts --------
-type TeamId = number
-
-export class VOService implements IGameModeEvents {
-    // teamId -> (capturePointId -> VO)
-    private readonly capturePointVOModules = new Map<
-        TeamId,
-        Map<number, mod.VO>
-    >()
-
-    // teamId -> (sectorId -> VO)
-    private readonly sectorVOModules = new Map<TeamId, Map<number, mod.VO>>()
-
-    constructor(
-        private readonly gameMode: PRSR_GameMode,
-        private readonly mapData: MapDataService
-    ) {
-        this.initCapturePointsVO()
-        this.initSectorsVO()
-
-        this.gameMode.addListener(this)
-    }
-
-    // -------------------------------------------------
-    // Init
-    // -------------------------------------------------
-
-    private initCapturePointsVO(): void {
-        const teams: TeamId[] = [1, 2]
-        const capturePointIds = this.mapData.getAllCapturePointIds()
-
-        for (const teamId of teams) {
-            const teamMap = new Map<number, mod.VO>()
-
-            for (const cpId of capturePointIds) {
-                const vo = mod.SpawnObject(
-                    mod.RuntimeSpawn_Common.SFX_VOModule_OneShot2D,
-                    mod.CreateVector(0, 0, 0),
-                    mod.CreateVector(0, 0, 0)
-                )
-
-                teamMap.set(cpId, vo)
-            }
-
-            this.capturePointVOModules.set(teamId, teamMap)
-        }
-    }
-
-    private initSectorsVO(): void {
-        const teams: TeamId[] = [1, 2]
-        const sectorIds = this.mapData.getAllSectorIds()
-
-        for (const teamId of teams) {
-            const teamMap = new Map<number, mod.VO>()
-
-            for (const sectorId of sectorIds) {
-                const vo = mod.SpawnObject(
-                    mod.RuntimeSpawn_Common.SFX_VOModule_OneShot2D,
-                    mod.CreateVector(0, 0, 0),
-                    mod.CreateVector(0, 0, 0)
-                )
-
-                teamMap.set(sectorId, vo)
-            }
-
-            this.sectorVOModules.set(teamId, teamMap)
-        }
-    }
-
-    // -------------------------------------------------
-    // Capture point events (resolved by GameMode)
-    // -------------------------------------------------
-
-    OnCapturePointCapturedResolved(eventCapturePoint: mod.CapturePoint): void {
-        const cpId = mod.GetObjId(eventCapturePoint)
-
-        const currentOwner = mod.GetCurrentOwnerTeam(eventCapturePoint)
-        const previousOwner = mod.GetPreviousOwnerTeam(eventCapturePoint)
-
-        if (!currentOwner || !previousOwner) {
-            return
-        }
-
-        const currentOwnerId = mod.GetObjId(currentOwner)
-        const previousOwnerId = mod.GetObjId(previousOwner)
-
-        const flag = this.mapData.getFlagForCapturePoint(cpId)
-        if (!flag) {
-            return
-        }
-
-        const friendlyVO = this.capturePointVOModules
-            .get(currentOwnerId)
-            ?.get(cpId)
-
-        const enemyVO = this.capturePointVOModules
-            .get(previousOwnerId)
-            ?.get(cpId)
-
-        if (enemyVO) {
-            mod.PlayVO(
-                enemyVO,
-                mod.VoiceOverEvents2D.ObjectiveCapturedEnemy,
-                flag,
-                previousOwner
-            )
-        }
-
-        if (friendlyVO) {
-            mod.PlayVO(
-                friendlyVO,
-                mod.VoiceOverEvents2D.ObjectiveCaptured,
-                flag,
-                currentOwner
-            )
-        }
-    }
-
-    OnCapturePointLost(eventCapturePoint: mod.CapturePoint): void {
-        const cpId = mod.GetObjId(eventCapturePoint)
-
-        const previousOwner = mod.GetPreviousOwnerTeam(eventCapturePoint)
-        if (!previousOwner) {
-            return
-        }
-
-        const previousOwnerId = mod.GetObjId(previousOwner)
-
-        const flag = this.mapData.getFlagForCapturePoint(cpId)
-        if (!flag) {
-            return
-        }
-
-        const voModule = this.capturePointVOModules
-            .get(previousOwnerId)
-            ?.get(cpId)
-
-        if (!voModule) {
-            return
-        }
-
-        mod.PlayVO(
-            voModule,
-            mod.VoiceOverEvents2D.ObjectiveLost,
-            flag,
-            previousOwner
-        )
-    }
-
-    // -------------------------------------------------
-    // Capture interaction (contested)
-    // -------------------------------------------------
-
-    OnPlayerEnterCapturePoint(
-        eventPlayer: mod.Player,
-        eventCapturePoint: mod.CapturePoint
-    ): void {
-        const ownerTeam = mod.GetCurrentOwnerTeam(eventCapturePoint)
-        if (!ownerTeam) {
-            return
-        }
-
-        const ownerTeamId = mod.GetObjId(ownerTeam)
-        const playerTeam = mod.GetTeam(eventPlayer)
-        const playerTeamId = mod.GetObjId(playerTeam)
-
-        // Only when entering enemy-owned capture point
-        if (ownerTeamId === 0 || ownerTeamId === playerTeamId) {
-            return
-        }
-
-        const cpId = mod.GetObjId(eventCapturePoint)
-        const flag = this.mapData.getFlagForCapturePoint(cpId)
-        if (!flag) {
-            return
-        }
-
-        const enemyVO = this.capturePointVOModules.get(ownerTeamId)?.get(cpId)
-
-        const friendlyVO = this.capturePointVOModules
-            .get(playerTeamId)
-            ?.get(cpId)
-
-        if (enemyVO) {
-            mod.PlayVO(
-                enemyVO,
-                mod.VoiceOverEvents2D.ObjectiveContested,
-                flag,
-                ownerTeam
-            )
-        }
-
-        if (friendlyVO) {
-            mod.PlayVO(
-                friendlyVO,
-                mod.VoiceOverEvents2D.ObjectiveLockdownFriendly,
-                flag,
-                playerTeam
-            )
-        }
-    }
-
-    // -------------------------------------------------
-    // Sector events (resolved by GameMode)
-    // -------------------------------------------------
-
-    async OnSectorChanged(
-        previousSectorId: number,
-        currentSectorId: number,
-        teamId: number,
-        bufferTime: number
-    ): Promise<void> {
-        const attackerTeam = mod.GetTeam(teamId)
-        const defenderTeam = mod.GetTeam(teamId === 1 ? 2 : 1)
-
-        const attackerVO = this.sectorVOModules
-            .get(teamId)
-            ?.get(previousSectorId)
-
-        const defenderVO = this.sectorVOModules
-            .get(teamId === 1 ? 2 : 1)
-            ?.get(previousSectorId)
-
-        const flag = mod.VoiceOverFlags.Alpha
-
-        if (attackerVO) {
-            mod.PlayVO(
-                attackerVO,
-                mod.VoiceOverEvents2D.SectorTakenAttacker,
-                flag,
-                attackerTeam
-            )
-        }
-
-        if (defenderVO) {
-            mod.PlayVO(
-                defenderVO,
-                mod.VoiceOverEvents2D.SectorTakenDefender,
-                flag,
-                defenderTeam
-            )
-        }
-    }
-}
-
-// -------- FILE: src\Core\UI\UIColors.ts --------
-/*
- * Shared UI color palette.
- * Colors are normalized RGB mod.Vector values.
- * Do not mutate at runtime.
- */
-export const CoreUI_Colors = {
-    White: mod.CreateVector(1, 1, 1),
-    Black: mod.CreateVector(0.031, 0.043, 0.043),
-
-    GreyLight: mod.CreateVector(0.835, 0.922, 0.976), // d5ebf9
-    Grey: mod.CreateVector(0.329, 0.369, 0.388), // 545e63
-    GreyDark: mod.CreateVector(0.212, 0.224, 0.235), // 36393c
-
-    BlueLight: mod.CreateVector(0.439, 0.922, 1), // 70ebff
-    BlueDark: mod.CreateVector(0.075, 0.184, 0.247), // 132f3f
-
-    RedLight: mod.CreateVector(1, 0.514, 0.38), // ff8361
-    RedDark: mod.CreateVector(0.251, 0.094, 0.067), // 401811
-
-    GreenLight: mod.CreateVector(0.678, 0.992, 0.525), // adfd86
-    GreenDark: mod.CreateVector(0.278, 0.447, 0.212), // 477236
-
-    YellowLight: mod.CreateVector(1, 0.988, 0.612), // fffc9c
-    YellowDark: mod.CreateVector(0.443, 0.376, 0), // 716000
-}
-
-// -------- FILE: src\GameModes\Pressure\Player\Components\PlayerUIComponent.ts --------
-/*
- * PlayerUIComponent
- *
- * Single UI composition root for a human player.
- * Owns all PRESSURE-specific UI and reacts to GameMode events.
- *
- * This component does NOT drive game logic.
- * It only reacts to already-finalized GameMode state.
- */
-export class PlayerUIComponent
-    implements CorePlayer_IComponent, IGameModeEvents
-{
-    private lp!: CorePlayer_APlayer
-    private gameMode!: PRSR_GameMode
-
-    private root!: mod.UIWidget
-
-    private sectorContainer!: mod.UIWidget
-    private sectorText!: mod.UIWidget
-    private sectorVisibleUntilMs = 0
-
-    private capturePointContainer!: mod.UIWidget
-    private capturePointText!: mod.UIWidget
-    private currentCapturePoint: mod.CapturePoint | null = null
-
-    private lastCapturePointLabelKey = 0
-
-    private static readonly CAPTURE_POINT_UI_DEBOUNCE_MS = 0.1
-    private capturePointUpdateToken = 0
-
-    // Countdown UI
-    private countdownText!: mod.UIWidget
-    private countdownEndAtMs = 0
-    private countdownLastSecond = -1
-
-    private readonly capturePointUiMap: {
-        [key: number]: { label: string; color: mod.Vector }
-    } = {
-        1: {
-            label: mod.stringkeys.gamemodes.PRSR.capturePoints.contested,
-            color: CoreUI_Colors.YellowLight,
-        },
-        2: {
-            label: mod.stringkeys.gamemodes.PRSR.capturePoints.defending,
-            color: CoreUI_Colors.White,
-        },
-        3: {
-            label: mod.stringkeys.gamemodes.PRSR.capturePoints.capturing,
-            color: CoreUI_Colors.BlueLight,
-        },
-        4: {
-            label: mod.stringkeys.gamemodes.PRSR.capturePoints.losing,
-            color: CoreUI_Colors.RedLight,
-        },
-    }
-
-    private readonly sectorUiMap: {
-        [key: number]: { label: string; color: mod.Vector }
-    } = {
-        1: {
-            label: mod.stringkeys.gamemodes.PRSR.sectors.taken,
-            color: CoreUI_Colors.BlueLight,
-        },
-        2: {
-            label: mod.stringkeys.gamemodes.PRSR.sectors.lost,
-            color: CoreUI_Colors.RedLight,
-        },
-    }
-
-    constructor(gameMode: PRSR_GameMode) {
-        this.gameMode = gameMode
-    }
-
-    // -------------------------------------------------
-    // Lifecycle
-    // -------------------------------------------------
-
-    onAttach(ap: CorePlayer_APlayer): void {
-        this.lp = ap
-
-        this.createRoot()
-        this.createSectorText()
-        this.createCapturePointText()
-        this.createCountdownText()
-
-        ap.addListener({
-            OngoingPlayer: () => this.tick(),
-
-            OnPlayerEnterCapturePoint: (eventCapturePoint) => {
-                this.currentCapturePoint = eventCapturePoint
-                mod.SetUIWidgetVisible(this.capturePointContainer, true)
-            },
-
-            OnPlayerExitCapturePoint: () => {
-                this.currentCapturePoint = null
-                this.lastCapturePointLabelKey = 0
-                mod.SetUIWidgetVisible(this.capturePointContainer, false)
-            },
-        })
-
-        this.gameMode.addListener(this)
-    }
-
-    onDetach(): void {
-        this.gameMode.removeListener(this)
-        mod.DeleteUIWidget(this.root)
-    }
-
-    // -------------------------------------------------
-    // GameMode events
-    // -------------------------------------------------
-
-    OnSectorChanged(
-        currentSectorId: number,
-        previousSectorId: number,
-        teamId: number,
-        bufferTime: number
-    ): void {
-        const labelKey = this.lp.teamId === teamId ? 1 : 2
-        const uiState = this.sectorUiMap[labelKey]
-
-        mod.SetUITextLabel(this.sectorText, mod.Message(uiState.label))
-        mod.SetUITextColor(this.sectorText, uiState.color)
-        mod.SetUIWidgetVisible(this.sectorContainer, true)
-
-        this.sectorVisibleUntilMs = Date.now() + bufferTime * 1000
-
-        // Example countdown (grace / buffer time)
-        this.showCountdown(bufferTime)
-    }
-
-    OngoingCapturePoint(eventCapturePoint: mod.CapturePoint): void {
-        if (
-            !this.currentCapturePoint ||
-            mod.GetObjId(eventCapturePoint) !==
-                mod.GetObjId(this.currentCapturePoint)
-        ) {
-            return
-        }
-
-        this.updateCapturePointState(eventCapturePoint)
-    }
-
-    // -------------------------------------------------
-    // Capture point UI logic
-    // -------------------------------------------------
-
-    private updateCapturePointState(capturePoint: mod.CapturePoint): void {
-        const playersOnPoint = mod.GetPlayersOnPoint(capturePoint)
-        const playersCount = mod.CountOf(playersOnPoint)
-
-        let myTeamCount = 0
-        let enemyTeamCount = 0
-
-        const myTeam = mod.GetTeam(this.lp.player)
-
-        for (let i = 0; i < playersCount; i++) {
-            const player = mod.ValueInArray(playersOnPoint, i) as mod.Player
-            const team = mod.GetTeam(player)
-
-            if (mod.GetObjId(team) === mod.GetObjId(myTeam)) {
-                myTeamCount++
-            } else {
-                enemyTeamCount++
-            }
-        }
-
-        const ownerTeam = mod.GetCurrentOwnerTeam(capturePoint)
-
-        let labelKey: number
-
-        switch (true) {
-            case myTeamCount === enemyTeamCount:
-                labelKey = 1
-                break
-
-            case myTeamCount > enemyTeamCount &&
-                mod.GetObjId(ownerTeam) === mod.GetObjId(myTeam):
-                labelKey = 2
-                break
-
-            case myTeamCount > enemyTeamCount:
-                labelKey = 3
-                break
-
-            default:
-                labelKey = 4
-        }
-
-        if (this.lastCapturePointLabelKey === labelKey) {
-            return
-        }
-
-        this.lastCapturePointLabelKey = labelKey
-        const uiState = this.capturePointUiMap[labelKey]
-
-        const token = ++this.capturePointUpdateToken
-        this.deferCapturePointLabel(uiState.label, uiState.color, token)
-    }
-
-    private async deferCapturePointLabel(
-        label: string,
-        color: mod.Vector,
-        token: number
-    ): Promise<void> {
-        await mod.Wait(PlayerUIComponent.CAPTURE_POINT_UI_DEBOUNCE_MS)
-
-        if (token !== this.capturePointUpdateToken) return
-        if (!this.currentCapturePoint) return
-
-        mod.SetUITextLabel(this.capturePointText, mod.Message(label))
-        mod.SetUITextColor(this.capturePointText, color)
-    }
-
-    // -------------------------------------------------
-    // Countdown UI
-    // -------------------------------------------------
-
-    private showCountdown(durationSec: number): void {
-        this.countdownEndAtMs = Date.now() + durationSec * 1000
-        this.countdownLastSecond = -1
-        mod.SetUIWidgetVisible(this.countdownText, true)
-    }
-
-    private hideCountdown(): void {
-        this.countdownEndAtMs = 0
-        this.countdownLastSecond = -1
-        mod.SetUIWidgetVisible(this.countdownText, false)
-    }
-
-    // -------------------------------------------------
-    // UI creation
-    // -------------------------------------------------
-
-    private createRoot(): void {
-        mod.AddUIContainer(
-            'player_ui_root_' + this.lp.id,
-            mod.CreateVector(0, 0, 0),
-            mod.CreateVector(1920, 1080, 0),
-            mod.UIAnchor.TopLeft,
-            mod.GetUIRoot(),
-            true,
-            0,
-            mod.CreateVector(0, 0, 0),
-            1,
-            mod.UIBgFill.None,
-            mod.UIDepth.AboveGameUI,
-            this.lp.player
-        )
-
-        this.root = mod.FindUIWidgetWithName('player_ui_root_' + this.lp.id)
-    }
-
-    private createSectorText(): void {
-        mod.AddUIContainer(
-            'sector_container_' + this.lp.id, // name: string,
-            mod.CreateVector(0, 80, 0), // position: Vector,
-            mod.CreateVector(1920, 140, 0), // size: Vector,
-            mod.UIAnchor.TopCenter, // anchor: UIAnchor,
-            this.root, // parent: UIWidget,
-            false, // visible: boolean,
-            0, // padding: number,
-            mod.CreateVector(0.9, 0.9, 0.9), // bgColor: Vector,
-            1, // bgAlpha: number,
-            mod.UIBgFill.Blur // bgFill: UIBgFill
-        )
-
-        this.sectorContainer = mod.FindUIWidgetWithName(
-            'sector_container_' + this.lp.id
-        )
-
-        mod.AddUIText(
-            'sector_text_' + this.lp.id,
-            mod.CreateVector(0, 10, 0),
-            mod.CreateVector(1920, 80, 0),
-            mod.UIAnchor.TopLeft,
-            this.sectorContainer,
-            true,
-            0,
-            CoreUI_Colors.Black,
-            1,
-            mod.UIBgFill.None,
-            mod.Message(1),
-            80,
-            CoreUI_Colors.White,
-            0.8,
-            mod.UIAnchor.TopCenter
-        )
-
-        this.sectorText = mod.FindUIWidgetWithName('sector_text_' + this.lp.id)
-    }
-
-    private createCapturePointText(): void {
-        mod.AddUIContainer(
-            'capture_point_container_' + this.lp.id, // name: string,
-            mod.CreateVector(0, 80, 0), // position: Vector,
-            mod.CreateVector(464, 140, 0), // size: Vector,
-            mod.UIAnchor.TopCenter, // anchor: UIAnchor,
-            this.root, // parent: UIWidget,
-            false, // visible: boolean,
-            0, // padding: number,
-            mod.CreateVector(0.9, 0.9, 0.9), // bgColor: Vector,
-            1, // bgAlpha: number,
-            mod.UIBgFill.Blur // bgFill: UIBgFill
-        )
-
-        this.capturePointContainer = mod.FindUIWidgetWithName(
-            'capture_point_container_' + this.lp.id
-        )
-
-        mod.AddUIText(
-            'capture_point_title_' + this.lp.id,
-            mod.CreateVector(0, 20, 0),
-            mod.CreateVector(400, 30, 0),
-            mod.UIAnchor.TopCenter,
-            this.capturePointContainer,
-            true,
-            0,
-            mod.CreateVector(0, 0, 0),
-            1,
-            mod.UIBgFill.None,
-            mod.Message('gamemodes.PRSR.capturePoint'),
-            30,
-            CoreUI_Colors.White,
-            0.5,
-            mod.UIAnchor.TopCenter
-        )
-
-        mod.AddUIText(
-            'capture_point_text_' + this.lp.id,
-            mod.CreateVector(0, 40, 0),
-            mod.CreateVector(400, 80, 0),
-            mod.UIAnchor.TopCenter,
-            this.capturePointContainer,
-            true,
-            0,
-            mod.CreateVector(0, 0, 0),
-            1,
-            mod.UIBgFill.None,
-            mod.Message(1),
-            80,
-            CoreUI_Colors.White,
-            0.8,
-            mod.UIAnchor.TopCenter
-        )
-
-        this.capturePointText = mod.FindUIWidgetWithName(
-            'capture_point_text_' + this.lp.id
-        )
-    }
-
-    private createCountdownText(): void {
-        mod.AddUIText(
-            'countdown_text_' + this.lp.id,
-            mod.CreateVector(0, 90, 0),
-            mod.CreateVector(1920, 30, 0),
-            mod.UIAnchor.TopLeft,
-            this.sectorContainer,
-            false,
-            0,
-            CoreUI_Colors.Black,
-            1,
-            mod.UIBgFill.None,
-            mod.Message(1),
-            30,
-            CoreUI_Colors.White,
-            0.6,
-            mod.UIAnchor.TopCenter
-        )
-
-        this.countdownText = mod.FindUIWidgetWithName(
-            'countdown_text_' + this.lp.id
-        )
-    }
-
-    // -------------------------------------------------
-    // Tick
-    // -------------------------------------------------
-
-    private tick(): void {
-        if (this.sectorVisibleUntilMs !== 0) {
-            if (mod.GetUIWidgetVisible(this.capturePointContainer)) {
-                mod.SetUIWidgetVisible(this.capturePointContainer, false)
-            }
-
-            if (Date.now() >= this.sectorVisibleUntilMs) {
-                mod.SetUIWidgetVisible(this.sectorContainer, false)
-
-                if (this.currentCapturePoint) {
-                    mod.SetUIWidgetVisible(this.capturePointContainer, true)
-                }
-
-                this.sectorVisibleUntilMs = 0
-            }
-        }
-
-        if (this.countdownEndAtMs === 0) return
-
-        const remainingMs = this.countdownEndAtMs - Date.now()
-        const remainingSec = Math.ceil(remainingMs / 1000)
-
-        if (remainingSec <= 0) {
-            this.hideCountdown()
-            return
-        }
-
-        if (remainingSec !== this.countdownLastSecond) {
-            this.countdownLastSecond = remainingSec
-            mod.SetUITextLabel(
-                this.countdownText,
-                mod.Message(
-                    `gamemodes.PRSR.sectors.countdown`,
-                    remainingSec
-                )
-            )
-        }
-    }
-}
-
-// -------- FILE: src\GameModes\Pressure\PRSR_GameMode.ts --------
-// Orchestrates Pressure gameplay while delegating VO playback to VOService.
-/**
- * GameMode
- *
- * Orchestrates Breakthrough gameplay.
- * Uses Core_AGameMode event system.
- * Emits Pressure-specific events.
- */
-export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
-    private CAPTURE_POINT_TIME = 6
-    private BOTS_UNSPAWN_DELAY = 10
-
-    protected declare playerManager: PlayerManager
+    private AI_UNSPAWN_DELAY = 10
+    private AI_COUNT_TEAM_1 = 3
+    private AI_COUNT_TEAM_2 = 8
 
     private squadManager: Core_SquadManager | null = null
-    public mapData!: MapDataService
+    private teamScores = new Map<number, number>()
 
-    private currentSectorId = 0
+    protected override OnGameModeStarted(): void {
+        mod.SetAIToHumanDamageModifier(2)
 
-    private readonly captureProgressMap = new Map<
-        number,
-        {
-            captureProgress: number
-            isCapturing: boolean
-        }
-    >()
+        mod.SetGameModeTargetScore(100)
 
-    // -------------------------------------------------
-    // Player manager
-    // -------------------------------------------------
-
-    protected createPlayerManager(): CorePlayer_APlayerManager {
-        return new PlayerManager()
-    }
-
-    // -------------------------------------------------
-    // Game mode lifecycle
-    // -------------------------------------------------
-
-    protected override async OnGameModeStarted(): Promise<void> {
         mod.SetScoreboardType(mod.ScoreboardType.CustomTwoTeams)
         mod.SetScoreboardColumnNames(
             mod.Message(`gamemodes.PRSR.scoreboard.score`),
@@ -5787,44 +3969,44 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
             mod.Message(`gamemodes.PRSR.scoreboard.teamKills`),
             mod.Message(`gamemodes.PRSR.scoreboard.killStreak`)
         )
-
-        mod.SetGameModeTargetScore(1)
         mod.SetScoreboardColumnWidths(1, 0.5, 0.5, 0.5, 0.5)
 
-        mod.SetFriendlyFire(true)
-        mod.SetGameModeTimeLimit(1200)
-        mod.SetAIToHumanDamageModifier(2)
-        mod.SetSpawnMode(mod.SpawnModes.Deploy)
+        mod.Wait(5).then(() => {
+            for (let i = 1; i <= this.AI_COUNT_TEAM_1; i++) {
+                mod.Wait(0.5).then(() =>
+                    this.playerManager.spawnLogicalBot(
+                        mod.SoldierClass.Assault,
+                        1,
+                        mod.GetObjectPosition(mod.GetHQ(1)),
+                        mod.Message(`core.ai.bots.${i}`),
+                        this.AI_UNSPAWN_DELAY
+                    )
+                )
+            }
 
-        this.mapData = new MapDataService()
-        new VOService(this, this.mapData)
-
-        this.initBots()
-        this.initSectors()
+            for (let j = 1; j <= this.AI_COUNT_TEAM_2; j++) {
+                mod.Wait(0.5).then(() =>
+                    this.playerManager.spawnLogicalBot(
+                        mod.SoldierClass.Assault,
+                        2,
+                        mod.GetObjectPosition(mod.GetHQ(2)),
+                        mod.Message(`core.ai.bots.${this.AI_COUNT_TEAM_1 + j}`),
+                        this.AI_UNSPAWN_DELAY
+                    )
+                )
+            }
+        })
     }
 
-    // -------------------------------------------------
-    // Player join / leave
-    // -------------------------------------------------
-
     protected override OnLogicalPlayerJoinGame(lp: CorePlayer_APlayer): void {
-        // mod.SetTeam(lp.player, mod.GetTeam(2))
-
-        if (!lp.isAI()) {
-            lp.addComponent(new PlayerUIComponent(this))
-        }
-
         // Set AI Brain
-        if (lp.isAI() && !lp.getComponent(BrainComponent)) {
+        if (lp.isLogicalAI()) {
             const brain = new CoreAI_Brain(
                 lp.player,
                 new CoreAI_CombatantProfile(
-                    () => this.getDefendWPs(),
                     () => [],
-                    () =>
-                        this.mapData.getAllCapturePointsInSector(
-                            this.currentSectorId
-                        )
+                    () => this.getRoamWps(1000, 1010),
+                    () => []
                 )
             )
 
@@ -5843,400 +4025,13 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
         if (!lp) return
 
         // Respawn persistent bot
-        if (lp.isPersistentAI()) {
-            this.playerManager.respawnBot(
+        if (lp.isLogicalAI()) {
+            this.playerManager.respawnLogicalBot(
                 lp,
-                this.mapData.getBotSpawnPos(this.currentSectorId, lp.teamId),
-                this.BOTS_UNSPAWN_DELAY
+                mod.GetObjectPosition(mod.GetHQ(lp.teamId)),
+                this.AI_UNSPAWN_DELAY
             )
         }
-    }
-
-    protected override async OnPlayerInteract(
-        eventPlayer: mod.Player,
-        eventInteractPoint: mod.InteractPoint
-    ): Promise<void> {
-        mod.EnableInteractPoint(eventInteractPoint, false)
-        await mod.Wait(30)
-        mod.EnableInteractPoint(eventInteractPoint, true)
-    }
-
-    // -------------------------------------------------
-    // Capture interaction
-    // -------------------------------------------------
-
-    protected override OnCapturePointCaptured(
-        eventCapturePoint: mod.CapturePoint
-    ): void {
-        const cpId = mod.GetObjId(eventCapturePoint)
-
-        const ownerTeam = mod.GetCurrentOwnerTeam(eventCapturePoint)
-        const ownerTeamId = mod.GetObjId(ownerTeam)
-
-        // BUG: need to set true first or false will not work
-        mod.EnableCapturePointDeploying(eventCapturePoint, true)
-        mod.EnableCapturePointDeploying(eventCapturePoint, false)
-
-        // Sector not fully controlled
-        if (
-            !this.mapData.doesTeamControlEntireSector(
-                this.currentSectorId,
-                ownerTeamId
-            )
-        ) {
-            this.emitCustom('OnCapturePointCapturedResolved', eventCapturePoint)
-            return
-        }
-
-        // Win condition
-        if (this.mapData.getWinCapturePointId(ownerTeamId) === cpId) {
-            mod.SetGameModeScore(ownerTeam, 1)
-            return
-        }
-
-        const nextSectorId = this.mapData.getNextSectorId(
-            this.currentSectorId,
-            ownerTeamId
-        )
-
-        if (nextSectorId === null || nextSectorId === this.currentSectorId) {
-            return
-        }
-
-        // Graceful transition
-        this.mapData.disableSector(this.currentSectorId, ownerTeamId)
-
-        const bufferHQ = this.mapData.getSectorBufferHQId(this.currentSectorId)
-        if (bufferHQ) {
-            this.enableSectorBufferHQ(bufferHQ, 10)
-        }
-
-        const previousSectorId = this.currentSectorId
-        this.currentSectorId = nextSectorId
-        this.mapData.enableSector(this.currentSectorId)
-
-        this.emitCustom(
-            'OnSectorChanged',
-            this.currentSectorId,
-            previousSectorId,
-            ownerTeamId,
-            10
-        )
-    }
-
-    protected override OngoingCapturePoint(
-        eventCapturePoint: mod.CapturePoint
-    ): void {
-        const captureProgress = mod.GetCaptureProgress(eventCapturePoint)
-
-        if (captureProgress === 0 || captureProgress === 1) {
-            return
-        }
-
-        const capturePointId = mod.GetObjId(eventCapturePoint)
-
-        const captureProgressMapEntry =
-            this.captureProgressMap.get(capturePointId)
-
-        if (!captureProgressMapEntry) {
-            this.captureProgressMap.set(capturePointId, {
-                captureProgress,
-                isCapturing: true,
-            })
-        }
-
-        if (captureProgress < captureProgressMapEntry!.captureProgress) {
-            // Neutralization
-            if (captureProgressMapEntry?.isCapturing) {
-                mod.SetCapturePointNeutralizationTime(
-                    eventCapturePoint,
-                    this.CAPTURE_POINT_TIME
-                )
-            }
-
-            this.captureProgressMap.set(capturePointId, {
-                captureProgress,
-                isCapturing: false,
-            })
-        } else {
-            // Capturing
-            if (!captureProgressMapEntry?.isCapturing) {
-                mod.SetCapturePointCapturingTime(
-                    eventCapturePoint,
-                    this.CAPTURE_POINT_TIME
-                )
-            }
-
-            this.captureProgressMap.set(capturePointId, {
-                captureProgress,
-                isCapturing: true,
-            })
-        }
-    }
-
-    // Bot spawning
-
-    private async initBots(): Promise<void> {
-        await mod.Wait(5)
-
-        const team1Count = this.mapData.getBotCount(1)
-        const team2Count = this.mapData.getBotCount(2)
-
-        for (let i = 1; i <= team1Count; i++) {
-            this.playerManager.spawnBot(
-                mod.SoldierClass.Assault,
-                1,
-                this.mapData.getBotSpawnPos(this.currentSectorId, 1),
-                mod.Message(`core.ai.bots.${i}`),
-                this.BOTS_UNSPAWN_DELAY,
-                true
-            )
-            await mod.Wait(1)
-        }
-
-        for (let j = 1; j <= team2Count; j++) {
-            this.playerManager.spawnBot(
-                mod.SoldierClass.Assault,
-                2,
-                this.mapData.getBotSpawnPos(this.currentSectorId, 2),
-                mod.Message(`core.ai.bots.${team1Count + j}`),
-                this.BOTS_UNSPAWN_DELAY,
-                true
-            )
-            await mod.Wait(1)
-        }
-    }
-
-    private initSectors() {
-        this.mapData.disableAllSectors()
-        this.currentSectorId = this.mapData.getInitSectorId()
-        this.mapData.enableSector(this.currentSectorId)
-    }
-
-    private async enableSectorBufferHQ(
-        bufferHQId: number,
-        duration: number
-    ): Promise<void> {
-        mod.SetHQTeam(mod.GetHQ(bufferHQId), mod.GetTeam(1))
-        await mod.Wait(duration)
-        mod.SetHQTeam(mod.GetHQ(bufferHQId), mod.GetTeam(0))
-    }
-
-    private getDefendWPs(): mod.Vector[] {
-        return this.mapData
-            .getAllCapturePointIds()
-            .map((id) => mod.GetObjectPosition(mod.GetCapturePoint(id)))
-    }
-}
-
-// -------- FILE: src\GameModes\TDM\Player\TDM_Player.ts --------
-export class TDM_Player extends CorePlayer_APlayer {
-    protectionComp: CorePlayer_ProtectionComponent
-    battleStatsComp: CorePlayer_BattleStatsComponent
-
-    constructor(player: mod.Player) {
-        super(player)
-
-        this.protectionComp = new CorePlayer_ProtectionComponent()
-        this.addComponent(this.protectionComp)
-
-        this.battleStatsComp = new CorePlayer_BattleStatsComponent()
-        this.addComponent(this.battleStatsComp)
-
-        this.addListener({
-            OnPlayerDeployed: () => {
-                // spawn protection
-                this.protectionComp.activate(5)
-
-                // stats
-                this.battleStatsComp.clearKillStreak()
-            },
-
-            OnPlayerDied: () => {
-                this.battleStatsComp.addDeath()
-
-                mod.Wait(0.1).then(() => {
-                    mod.Kill(this.player)
-                })
-            },
-
-            OnPlayerEarnedKill: (
-                eventOtherPlayer,
-                eventDeathType,
-                eventWeaponUnlock
-            ) => {
-                if (!eventOtherPlayer) {
-                    return
-                }
-
-                if (
-                    mod.Equals(
-                        mod.GetTeam(this.player),
-                        mod.GetTeam(eventOtherPlayer.player)
-                    )
-                ) {
-                    if (!mod.Equals(this.player, eventOtherPlayer.player)) {
-                        this.battleStatsComp.addTeamKill()
-                    }
-                } else {
-                    this.battleStatsComp.addKill()
-                    this.battleStatsComp.addKillStreak()
-                    this.battleStatsComp.addScore(
-                        100 + (this.battleStatsComp.getKillStreak() - 1) * 10
-                    )
-                }
-            },
-
-            OngoingPlayer: () => {
-                if (!mod.IsPlayerValid(this.player)) {
-                    return
-                }
-
-                mod.SetScoreboardPlayerValues(
-                    this.player,
-                    this.battleStatsComp.getScore(),
-                    this.battleStatsComp.getKills(),
-                    this.battleStatsComp.getDeaths(),
-                    this.battleStatsComp.getTeamKills(),
-                    this.battleStatsComp.getKillStreak()
-                )
-            },
-        })
-    }
-}
-
-// -------- FILE: src\GameModes\TDM\Player\TDM_PlayerManager.ts --------
-export class TDM_PlayerManager extends CorePlayer_APlayerManager {
-    constructor() {
-        super(TDM_Player)
-    }
-}
-
-// -------- FILE: src\GameModes\TDM\TDM_GameMode.ts --------
-export class TDM_GameMode extends Core_AGameMode {
-    protected override createPlayerManager(): CorePlayer_APlayerManager {
-        return new TDM_PlayerManager()
-    }
-
-    private teamScores = new Map<number, number>()
-
-    private AI_UNSPAWN_DELAY = 5
-
-    protected override OnGameModeStarted(): void {
-        mod.SetFriendlyFire(true)
-        mod.SetGameModeTargetScore(100)
-
-        /*
-         *
-         */
-        mod.SetScoreboardType(mod.ScoreboardType.CustomTwoTeams)
-        mod.SetScoreboardColumnNames(
-            mod.Message(`gamemodes.PRSR.scoreboard.score`),
-            mod.Message(`gamemodes.PRSR.scoreboard.kills`),
-            mod.Message(`gamemodes.PRSR.scoreboard.deaths`),
-            mod.Message(`gamemodes.PRSR.scoreboard.teamKills`),
-            mod.Message(`gamemodes.PRSR.scoreboard.killStreak`)
-        )
-        mod.SetScoreboardColumnWidths(1, 0.5, 0.5, 0.5, 0.5)
-
-        /*
-         *
-         */
-        this.playerManager.spawnBot(
-            mod.SoldierClass.Assault,
-            1,
-            mod.GetObjectPosition(mod.GetHQ(2)),
-            mod.Message(`core.ai.bots.1`),
-            this.AI_UNSPAWN_DELAY,
-            true
-        )
-
-        /* this.playerManager.spawnBot(
-            mod.SoldierClass.Assault,
-            1,
-            mod.GetObjectPosition(mod.GetHQ(1)),
-            mod.Message(`core.ai.bots.2`),
-            this.AI_UNSPAWN_DELAY,
-            true
-        ) */
-
-        const vehicleSpawner = mod.SpawnObject(
-            mod.RuntimeSpawn_Common.VehicleSpawner,
-            mod.GetObjectPosition(mod.GetHQ(1)),
-            mod.CreateVector(0, 0, 0)
-        )
-
-        mod.Wait(7).then(() => {
-            mod.SetVehicleSpawnerVehicleType(
-                vehicleSpawner,
-                mod.VehicleList.Abrams
-            )
-            mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
-        })
-    }
-
-    private vehicle: mod.Vehicle | null = null
-
-    protected override OnVehicleSpawned(eventVehicle: mod.Vehicle): void {
-        this.vehicle = eventVehicle
-        /* mod.DisplayHighlightedWorldLogMessage(
-            mod.Message(mod.GetObjId(eventVehicle))
-        ) */
-    }
-
-    protected override async OnLogicalPlayerJoinGame(
-        lp: CorePlayer_APlayer
-    ): Promise<void> {
-        await mod.Wait(9)
-        if (lp.isAI() && this.vehicle) {
-            mod.ForcePlayerToSeat(lp.player, this.vehicle, 0)
-            mod.AIValidatedMoveToBehavior(
-                lp.player,
-                mod.GetObjectPosition(mod.GetHQ(2))
-            )
-            /*
-            await mod.Wait(10)
-
-            mod.AIValidatedMoveToBehavior(
-                lp.player,
-                mod.GetObjectPosition(mod.GetHQ(1))
-            ) */
-            // mod.DisplayHighlightedWorldLogMessage(mod.Message(666))
-            // mod.ForcePlayerExitVehicle(lp.player, this.vehicle)
-
-            /* mod.AIDefendPositionBehavior(
-                lp.player,
-                mod.GetObjectPosition(mod.GetHQ(2)),
-                0,
-                20
-            ) */
-        }
-    }
-
-    protected override async OnAIMoveToSucceeded(
-        eventPlayer: mod.Player
-    ): Promise<void> {
-        const player = mod.GetPlayerFromVehicleSeat(this.vehicle!, 0)
-
-        // await mod.Wait(5)
-        mod.ForcePlayerExitVehicle(player, this.vehicle!)
-        await mod.Wait(0)
-        mod.ForcePlayerToSeat(player, this.vehicle!, 0)
-        mod.AIValidatedMoveToBehavior(
-            player,
-            mod.GetObjectPosition(mod.GetHQ(1))
-        )
-        /* mod.DisplayHighlightedWorldLogMessage(
-            mod.Message(mod.GetObjId(mod.GetVehicleFromPlayer(eventPlayer)))
-        ) */
-        /* if (this.vehicle) {
-            mod.DisplayHighlightedWorldLogMessage(mod.Message(111))
-            mod.ForcePlayerExitVehicle(eventPlayer, this.vehicle)
-        } */
-    }
-
-    protected override OnAIMoveToFailed(eventPlayer: mod.Player): void {
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(222))
     }
 
     protected override OnPlayerEarnedKill(
@@ -6255,20 +4050,6 @@ export class TDM_GameMode extends Core_AGameMode {
         const teamScore = this.addTeamScore(team, 1)
 
         mod.SetGameModeScore(team, teamScore)
-    }
-
-    protected override OnPlayerLeaveGame(eventNumber: number): void {
-        const lp = this.playerManager.getById(eventNumber)
-        if (!lp) return
-
-        // Respawn persistent bot
-        if (lp.isPersistentAI()) {
-            this.playerManager.respawnBot(
-                lp,
-                mod.GetObjectPosition(mod.GetHQ(1)),
-                this.AI_UNSPAWN_DELAY
-            )
-        }
     }
 
     protected override OngoingGlobal(): void {
@@ -6292,41 +4073,16 @@ export class TDM_GameMode extends Core_AGameMode {
         this.teamScores.set(teamId, nextScore)
         return nextScore
     }
-}
 
-// -------- FILE: src\GameModes\Template\Player\TPL_Player.ts --------
-export class TPL_Player extends CorePlayer_APlayer {
-    constructor(player: mod.Player) {
-        super(player)
+    private getRoamWps(from: number, to: number): mod.Vector[] {
+        const out: mod.Vector[] = []
 
-        this.addListener({
-            OnPlayerDeployed: () => {
-                mod.DisplayHighlightedWorldLogMessage(
-                    mod.Message(
-                        `gamemodes.TPL.playerDeployed`,
-                        mod.GetObjId(this.player)
-                    )
-                )
-            },
-        })
-    }
-}
+        for (let id = from; id <= to; id++) {
+            const wp = mod.GetSpatialObject(id)
+            out.push(mod.GetObjectPosition(wp))
+        }
 
-// -------- FILE: src\GameModes\Template\Player\TPL_PlayerManager.ts --------
-export class TPL_PlayerManager extends CorePlayer_APlayerManager {
-    constructor() {
-        super(TPL_Player)
-    }
-}
-
-// -------- FILE: src\GameModes\Template\TPL_GameMode.ts --------
-export class TPL_GameMode extends Core_AGameMode {
-    protected override createPlayerManager(): CorePlayer_APlayerManager {
-        return new TPL_PlayerManager()
-    }
-
-    protected override OnGameModeStarted(): void {
-        mod.DisplayNotificationMessage(mod.Message(`gamemodes.TPL.gamemodeStarted`))
+        return out
     }
 }
 
@@ -6399,6 +4155,8 @@ export class TPL_GameMode extends Core_AGameMode {
  * separation between routing and gameplay code, unify PlayerManager access,
  * and ensure that custom game modes behave consistently with the engine rules.
  */
+// import { PRSR_GameMode } from './GameModes/Pressure/PRSR_GameMode'
+// import { TPL_GameMode } from './GameModes/Template/TPL_GameMode'
 const gameMode: Core_AGameMode = new TDM_GameMode()
 
 // This will trigger every engine tick while the gamemode is running.

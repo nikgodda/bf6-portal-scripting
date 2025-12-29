@@ -17,10 +17,7 @@ export class TDM_Player extends CorePlayer_APlayer {
 
         this.addListener({
             OnPlayerDeployed: () => {
-                // spawn protection
                 this.protectionComp.activate(5)
-
-                // stats
                 this.battleStatsComp.clearKillStreak()
             },
 

@@ -1,6 +1,6 @@
 import { Core_AGameMode } from '../AGameMode'
 import { CorePlayer_IPlayerEvents } from './IPlayerEvents'
-import { CorePlayer_PersistentAIComponent } from './Components/AI/PerisistentAIComponent'
+import { CorePlayer_LogicalAIComponent } from './Components/AI/LogicalAIComponent'
 
 /**
  * CorePlayer_APlayer
@@ -37,18 +37,18 @@ export abstract class CorePlayer_APlayer {
         )
     }
 
-    isPersistentAI(): boolean {
-        return !!this.persistentAIComp
+    isLogicalAI(): boolean {
+        return !!this.logicalAIComp
     }
 
     /* ------------------------------------------------------------
      * Common component shortcuts
      * ------------------------------------------------------------ */
 
-    public get persistentAIComp():
-        | CorePlayer_PersistentAIComponent
+    public get logicalAIComp():
+        | CorePlayer_LogicalAIComponent
         | undefined {
-        return this.getComponent(CorePlayer_PersistentAIComponent)
+        return this.getComponent(CorePlayer_LogicalAIComponent)
     }
 
     /* ------------------------------------------------------------

@@ -1,5 +1,5 @@
 import { CorePlayer_APlayer } from './APlayer'
-import { CorePlayer_PersistentAIComponent } from './Components/AI/PerisistentAIComponent'
+import { CorePlayer_LogicalAIComponent as CorePlayer_LogicalAIComponent } from './Components/AI/LogicalAIComponent'
 
 /**
  * CorePlayer_APlayerManager
@@ -245,7 +245,6 @@ export class CorePlayer_APlayerManager<
             teamId: number
             soldierClass: mod.SoldierClass
             displayName: mod.Message
-            isLogical: boolean
         }
     >()
 
@@ -255,11 +254,8 @@ export class CorePlayer_APlayerManager<
     ): void {
         const spawnerId = mod.GetObjId(eventSpawner)
         const entry = this.spawnerMap.get(spawnerId)
-        if (!entry) return
 
-        // Non-logical bot: engine-only AI
-        if (!entry.isLogical) {
-            this.spawnerMap.delete(spawnerId)
+        if (!entry) {
             return
         }
 
@@ -271,7 +267,7 @@ export class CorePlayer_APlayerManager<
 
             // Attach AI identity
             lp.addComponent(
-                new CorePlayer_PersistentAIComponent(
+                new CorePlayer_LogicalAIComponent(
                     entry.soldierClass,
                     entry.displayName,
                     eventSpawner
@@ -304,13 +300,12 @@ export class CorePlayer_APlayerManager<
      * Bot spawner API
      * ------------------------------------------------------------ */
 
-    public spawnBot(
+    public spawnLogicalBot(
         soldierClass: mod.SoldierClass,
         teamId: number,
         pos: mod.Vector,
         displayName: mod.Message,
         unspawnDelay: number,
-        isLogical: boolean = true,
         lp?: TPlayer
     ): void {
         const spawner = mod.SpawnObject(
@@ -329,7 +324,6 @@ export class CorePlayer_APlayerManager<
             teamId,
             soldierClass,
             displayName,
-            isLogical,
         })
 
         mod.SpawnAIFromAISpawner(
@@ -340,22 +334,21 @@ export class CorePlayer_APlayerManager<
         )
     }
 
-    public respawnBot(
+    public respawnLogicalBot(
         lp: TPlayer,
         spawnPos: mod.Vector,
         unspawnDelay: number
     ): void {
-        if (!lp.persistentAIComp) {
+        if (!lp.logicalAIComp) {
             return
         }
 
-        this.spawnBot(
-            lp.persistentAIComp.soldierClass,
+        this.spawnLogicalBot(
+            lp.logicalAIComp.soldierClass,
             lp.teamId,
             spawnPos,
-            lp.persistentAIComp.displayName,
+            lp.logicalAIComp.displayName,
             unspawnDelay,
-            true,
             lp
         )
     }

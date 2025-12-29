@@ -119,8 +119,8 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
         if (!lp) return
 
         // Respawn persistent bot
-        if (lp.isPersistentAI()) {
-            this.playerManager.respawnBot(
+        if (lp.isLogicalAI()) {
+            this.playerManager.respawnLogicalBot(
                 lp,
                 this.mapData.getBotSpawnPos(this.currentSectorId, lp.teamId),
                 this.BOTS_UNSPAWN_DELAY
@@ -259,25 +259,23 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
         const team2Count = this.mapData.getBotCount(2)
 
         for (let i = 1; i <= team1Count; i++) {
-            this.playerManager.spawnBot(
+            this.playerManager.spawnLogicalBot(
                 mod.SoldierClass.Assault,
                 1,
                 this.mapData.getBotSpawnPos(this.currentSectorId, 1),
                 mod.Message(`core.ai.bots.${i}`),
-                this.BOTS_UNSPAWN_DELAY,
-                true
+                this.BOTS_UNSPAWN_DELAY
             )
             await mod.Wait(1)
         }
 
         for (let j = 1; j <= team2Count; j++) {
-            this.playerManager.spawnBot(
+            this.playerManager.spawnLogicalBot(
                 mod.SoldierClass.Assault,
                 2,
                 this.mapData.getBotSpawnPos(this.currentSectorId, 2),
                 mod.Message(`core.ai.bots.${team1Count + j}`),
-                this.BOTS_UNSPAWN_DELAY,
-                true
+                this.BOTS_UNSPAWN_DELAY
             )
             await mod.Wait(1)
         }

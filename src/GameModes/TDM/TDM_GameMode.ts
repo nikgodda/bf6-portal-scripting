@@ -2,23 +2,28 @@ import { Core_AGameMode } from 'src/Core/AGameMode'
 import { CorePlayer_APlayerManager } from 'src/Core/Player/APlayerManager'
 import { TDM_PlayerManager } from './Player/TDM_PlayerManager'
 import { CorePlayer_APlayer } from 'src/Core/Player/APlayer'
+import { CoreAI_Brain } from 'src/Core/AI/Brain'
+import { CoreAI_CombatantProfile } from 'src/Core/AI/Profiles/CombatantProfile'
+import { BrainComponent } from 'src/Core/AI/Components/BrainComponent'
+import { Core_SquadManager } from 'src/Core/Squad/SquadManager'
 
 export class TDM_GameMode extends Core_AGameMode {
     protected override createPlayerManager(): CorePlayer_APlayerManager {
         return new TDM_PlayerManager()
     }
 
+    private AI_UNSPAWN_DELAY = 10
+    private AI_COUNT_TEAM_1 = 3
+    private AI_COUNT_TEAM_2 = 8
+
+    private squadManager: Core_SquadManager | null = null
     private teamScores = new Map<number, number>()
 
-    private AI_UNSPAWN_DELAY = 5
-
     protected override OnGameModeStarted(): void {
-        mod.SetFriendlyFire(true)
+        mod.SetAIToHumanDamageModifier(2)
+
         mod.SetGameModeTargetScore(100)
 
-        /*
-         *
-         */
         mod.SetScoreboardType(mod.ScoreboardType.CustomTwoTeams)
         mod.SetScoreboardColumnNames(
             mod.Message(`gamemodes.PRSR.scoreboard.score`),
@@ -29,104 +34,67 @@ export class TDM_GameMode extends Core_AGameMode {
         )
         mod.SetScoreboardColumnWidths(1, 0.5, 0.5, 0.5, 0.5)
 
-        /*
-         *
-         */
-        this.playerManager.spawnBot(
-            mod.SoldierClass.Assault,
-            1,
-            mod.GetObjectPosition(mod.GetHQ(2)),
-            mod.Message(`core.ai.bots.1`),
-            this.AI_UNSPAWN_DELAY,
-            true
-        )
+        mod.Wait(5).then(() => {
+            for (let i = 1; i <= this.AI_COUNT_TEAM_1; i++) {
+                mod.Wait(0.5).then(() =>
+                    this.playerManager.spawnLogicalBot(
+                        mod.SoldierClass.Assault,
+                        1,
+                        mod.GetObjectPosition(mod.GetHQ(1)),
+                        mod.Message(`core.ai.bots.${i}`),
+                        this.AI_UNSPAWN_DELAY
+                    )
+                )
+            }
 
-        /* this.playerManager.spawnBot(
-            mod.SoldierClass.Assault,
-            1,
-            mod.GetObjectPosition(mod.GetHQ(1)),
-            mod.Message(`core.ai.bots.2`),
-            this.AI_UNSPAWN_DELAY,
-            true
-        ) */
-
-        const vehicleSpawner = mod.SpawnObject(
-            mod.RuntimeSpawn_Common.VehicleSpawner,
-            mod.GetObjectPosition(mod.GetHQ(1)),
-            mod.CreateVector(0, 0, 0)
-        )
-
-        mod.Wait(7).then(() => {
-            mod.SetVehicleSpawnerVehicleType(
-                vehicleSpawner,
-                mod.VehicleList.Abrams
-            )
-            mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
+            for (let j = 1; j <= this.AI_COUNT_TEAM_2; j++) {
+                mod.Wait(0.5).then(() =>
+                    this.playerManager.spawnLogicalBot(
+                        mod.SoldierClass.Assault,
+                        2,
+                        mod.GetObjectPosition(mod.GetHQ(2)),
+                        mod.Message(`core.ai.bots.${this.AI_COUNT_TEAM_1 + j}`),
+                        this.AI_UNSPAWN_DELAY
+                    )
+                )
+            }
         })
     }
 
-    private vehicle: mod.Vehicle | null = null
-
-    protected override OnVehicleSpawned(eventVehicle: mod.Vehicle): void {
-        this.vehicle = eventVehicle
-        /* mod.DisplayHighlightedWorldLogMessage(
-            mod.Message(mod.GetObjId(eventVehicle))
-        ) */
-    }
-
-    protected override async OnLogicalPlayerJoinGame(
-        lp: CorePlayer_APlayer
-    ): Promise<void> {
-        await mod.Wait(9)
-        if (lp.isAI() && this.vehicle) {
-            mod.ForcePlayerToSeat(lp.player, this.vehicle, 0)
-            mod.AIValidatedMoveToBehavior(
+    protected override OnLogicalPlayerJoinGame(lp: CorePlayer_APlayer): void {
+        // Set AI Brain
+        if (lp.isLogicalAI()) {
+            const brain = new CoreAI_Brain(
                 lp.player,
-                mod.GetObjectPosition(mod.GetHQ(2))
+                new CoreAI_CombatantProfile(
+                    () => [],
+                    () => this.getRoamWps(1000, 1010),
+                    () => []
+                )
             )
-            /*
-            await mod.Wait(10)
 
-            mod.AIValidatedMoveToBehavior(
-                lp.player,
-                mod.GetObjectPosition(mod.GetHQ(1))
-            ) */
-            // mod.DisplayHighlightedWorldLogMessage(mod.Message(666))
-            // mod.ForcePlayerExitVehicle(lp.player, this.vehicle)
-
-            /* mod.AIDefendPositionBehavior(
-                lp.player,
-                mod.GetObjectPosition(mod.GetHQ(2)),
-                0,
-                20
-            ) */
+            lp.addComponent(new BrainComponent(brain))
         }
+
+        if (!this.squadManager) {
+            this.squadManager = new Core_SquadManager(this, 2)
+        }
+
+        this.squadManager.addToSquad(lp)
     }
 
-    protected override async OnAIMoveToSucceeded(
-        eventPlayer: mod.Player
-    ): Promise<void> {
-        const player = mod.GetPlayerFromVehicleSeat(this.vehicle!, 0)
+    protected override OnPlayerLeaveGame(eventNumber: number): void {
+        const lp = this.playerManager.getById(eventNumber)
+        if (!lp) return
 
-        // await mod.Wait(5)
-        mod.ForcePlayerExitVehicle(player, this.vehicle!)
-        await mod.Wait(0)
-        mod.ForcePlayerToSeat(player, this.vehicle!, 0)
-        mod.AIValidatedMoveToBehavior(
-            player,
-            mod.GetObjectPosition(mod.GetHQ(1))
-        )
-        /* mod.DisplayHighlightedWorldLogMessage(
-            mod.Message(mod.GetObjId(mod.GetVehicleFromPlayer(eventPlayer)))
-        ) */
-        /* if (this.vehicle) {
-            mod.DisplayHighlightedWorldLogMessage(mod.Message(111))
-            mod.ForcePlayerExitVehicle(eventPlayer, this.vehicle)
-        } */
-    }
-
-    protected override OnAIMoveToFailed(eventPlayer: mod.Player): void {
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(222))
+        // Respawn persistent bot
+        if (lp.isLogicalAI()) {
+            this.playerManager.respawnLogicalBot(
+                lp,
+                mod.GetObjectPosition(mod.GetHQ(lp.teamId)),
+                this.AI_UNSPAWN_DELAY
+            )
+        }
     }
 
     protected override OnPlayerEarnedKill(
@@ -145,20 +113,6 @@ export class TDM_GameMode extends Core_AGameMode {
         const teamScore = this.addTeamScore(team, 1)
 
         mod.SetGameModeScore(team, teamScore)
-    }
-
-    protected override OnPlayerLeaveGame(eventNumber: number): void {
-        const lp = this.playerManager.getById(eventNumber)
-        if (!lp) return
-
-        // Respawn persistent bot
-        if (lp.isPersistentAI()) {
-            this.playerManager.respawnBot(
-                lp,
-                mod.GetObjectPosition(mod.GetHQ(1)),
-                this.AI_UNSPAWN_DELAY
-            )
-        }
     }
 
     protected override OngoingGlobal(): void {
@@ -181,5 +135,16 @@ export class TDM_GameMode extends Core_AGameMode {
         const nextScore = currentScore + deltaScore
         this.teamScores.set(teamId, nextScore)
         return nextScore
+    }
+
+    private getRoamWps(from: number, to: number): mod.Vector[] {
+        const out: mod.Vector[] = []
+
+        for (let id = from; id <= to; id++) {
+            const wp = mod.GetSpatialObject(id)
+            out.push(mod.GetObjectPosition(wp))
+        }
+
+        return out
     }
 }

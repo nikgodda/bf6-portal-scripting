@@ -1,7 +1,7 @@
 import { CorePlayer_APlayer } from '../../APlayer'
 import { CorePlayer_IComponent } from '../../APlayer'
 
-export class CorePlayer_PersistentAIComponent implements CorePlayer_IComponent {
+export class CorePlayer_LogicalAIComponent implements CorePlayer_IComponent {
     public soldierClass: mod.SoldierClass
     public displayName: mod.Message
     public spawner: mod.Spawner
