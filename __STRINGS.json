@@ -107,8 +107,10 @@
       "gamemodeStarted": "GameMode Started!"
     },
     "TDM": {
-      "playerDeployed": "Player Deployed: {}",
-      "gamemodeStarted": "GameMode Started!"
+      "scoreboard": {
+        "team1": "Team1 {}",
+        "team2": "Team2 {}"
+      }
     }
   }
 }

@@ -154,15 +154,17 @@ export abstract class CorePlayer_APlayer {
         )
     }
 
-    isLogicalAI(): boolean {
-        return !!this.aiComp
+    isPersistentAI(): boolean {
+        return !!this.persistentAIComp
     }
 
     /* ------------------------------------------------------------
      * Common component shortcuts
      * ------------------------------------------------------------ */
 
-    public get aiComp(): CorePlayer_PersistentAIComponent | undefined {
+    public get persistentAIComp():
+        | CorePlayer_PersistentAIComponent
+        | undefined {
         return this.getComponent(CorePlayer_PersistentAIComponent)
     }
 
@@ -764,15 +766,15 @@ export class CorePlayer_APlayerManager<
         spawnPos: mod.Vector,
         unspawnDelay: number
     ): void {
-        if (!lp.aiComp) {
+        if (!lp.persistentAIComp) {
             return
         }
 
         this.spawnBot(
-            lp.aiComp.soldierClass,
+            lp.persistentAIComp.soldierClass,
             lp.teamId,
             spawnPos,
-            lp.aiComp.displayName,
+            lp.persistentAIComp.displayName,
             unspawnDelay,
             true,
             lp
@@ -1041,9 +1043,7 @@ export abstract class Core_AGameMode<
      *
      */
 
-    protected OnLogicalPlayerJoinGame(
-        logicalPlayer: CorePlayer_APlayer
-    ): void {}
+    protected OnLogicalPlayerJoinGame(lp: CorePlayer_APlayer): void {}
 
     /* ------------------------------------------------------------
      * Internal router: main.ts -> _internal -> PlayerManager + hooks + emit
@@ -1682,9 +1682,9 @@ export abstract class Core_AGameMode<
          *
          */
 
-        OnLogicalPlayerJoinGame: (logicalPlayer: CorePlayer_APlayer): void => {
-            this.OnLogicalPlayerJoinGame(logicalPlayer)
-            this.emitEngine('OnLogicalPlayerJoinGame', logicalPlayer)
+        OnLogicalPlayerJoinGame: (lp: CorePlayer_APlayer): void => {
+            this.OnLogicalPlayerJoinGame(lp)
+            this.emitEngine('OnLogicalPlayerJoinGame', lp)
         },
     }
 
@@ -5843,7 +5843,7 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
         if (!lp) return
 
         // Respawn persistent bot
-        if (lp.isLogicalAI()) {
+        if (lp.isPersistentAI()) {
             this.playerManager.respawnBot(
                 lp,
                 this.mapData.getBotSpawnPos(this.currentSectorId, lp.teamId),
@@ -6031,16 +6031,74 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
 
 // -------- FILE: src\GameModes\TDM\Player\TDM_Player.ts --------
 export class TDM_Player extends CorePlayer_APlayer {
+    protectionComp: CorePlayer_ProtectionComponent
+    battleStatsComp: CorePlayer_BattleStatsComponent
+
     constructor(player: mod.Player) {
         super(player)
 
+        this.protectionComp = new CorePlayer_ProtectionComponent()
+        this.addComponent(this.protectionComp)
+
+        this.battleStatsComp = new CorePlayer_BattleStatsComponent()
+        this.addComponent(this.battleStatsComp)
+
         this.addListener({
             OnPlayerDeployed: () => {
-                mod.DisplayHighlightedWorldLogMessage(
-                    mod.Message(
-                        `gamemodes.TDM.playerDeployed`,
-                        mod.GetObjId(this.player)
+                // spawn protection
+                this.protectionComp.activate(5)
+
+                // stats
+                this.battleStatsComp.clearKillStreak()
+            },
+
+            OnPlayerDied: () => {
+                this.battleStatsComp.addDeath()
+
+                mod.Wait(0.1).then(() => {
+                    mod.Kill(this.player)
+                })
+            },
+
+            OnPlayerEarnedKill: (
+                eventOtherPlayer,
+                eventDeathType,
+                eventWeaponUnlock
+            ) => {
+                if (!eventOtherPlayer) {
+                    return
+                }
+
+                if (
+                    mod.Equals(
+                        mod.GetTeam(this.player),
+                        mod.GetTeam(eventOtherPlayer.player)
                     )
+                ) {
+                    if (!mod.Equals(this.player, eventOtherPlayer.player)) {
+                        this.battleStatsComp.addTeamKill()
+                    }
+                } else {
+                    this.battleStatsComp.addKill()
+                    this.battleStatsComp.addKillStreak()
+                    this.battleStatsComp.addScore(
+                        100 + (this.battleStatsComp.getKillStreak() - 1) * 10
+                    )
+                }
+            },
+
+            OngoingPlayer: () => {
+                if (!mod.IsPlayerValid(this.player)) {
+                    return
+                }
+
+                mod.SetScoreboardPlayerValues(
+                    this.player,
+                    this.battleStatsComp.getScore(),
+                    this.battleStatsComp.getKills(),
+                    this.battleStatsComp.getDeaths(),
+                    this.battleStatsComp.getTeamKills(),
+                    this.battleStatsComp.getKillStreak()
                 )
             },
         })
@@ -6060,8 +6118,137 @@ export class TDM_GameMode extends Core_AGameMode {
         return new TDM_PlayerManager()
     }
 
+    private teamScores = new Map<number, number>()
+
+    private AI_UNSPAWN_DELAY = 5
+
     protected override OnGameModeStarted(): void {
-        mod.DisplayNotificationMessage(mod.Message(`gamemodes.TDM.gamemodeStarted`))
+        mod.SetFriendlyFire(true)
+        mod.SetGameModeTargetScore(100)
+
+        /*
+         *
+         */
+        mod.SetScoreboardType(mod.ScoreboardType.CustomTwoTeams)
+        mod.SetScoreboardColumnNames(
+            mod.Message(`gamemodes.PRSR.scoreboard.score`),
+            mod.Message(`gamemodes.PRSR.scoreboard.kills`),
+            mod.Message(`gamemodes.PRSR.scoreboard.deaths`),
+            mod.Message(`gamemodes.PRSR.scoreboard.teamKills`),
+            mod.Message(`gamemodes.PRSR.scoreboard.killStreak`)
+        )
+        mod.SetScoreboardColumnWidths(1, 0.5, 0.5, 0.5, 0.5)
+
+        /*
+         *
+         */
+        this.playerManager.spawnBot(
+            mod.SoldierClass.Assault,
+            1,
+            mod.GetObjectPosition(mod.GetHQ(1)),
+            mod.Message(`core.ai.bots.1`),
+            this.AI_UNSPAWN_DELAY,
+            true
+        )
+
+        /* this.playerManager.spawnBot(
+            mod.SoldierClass.Assault,
+            1,
+            mod.GetObjectPosition(mod.GetHQ(1)),
+            mod.Message(`core.ai.bots.2`),
+            this.AI_UNSPAWN_DELAY,
+            true
+        ) */
+
+        const vehicleSpawner = mod.SpawnObject(
+            mod.RuntimeSpawn_Common.VehicleSpawner,
+            mod.GetObjectPosition(mod.GetHQ(2)),
+            mod.CreateVector(0, 0, 0)
+        )
+
+        mod.SetVehicleSpawnerVehicleType(
+            vehicleSpawner,
+            mod.VehicleList.Marauder
+        )
+
+        mod.Wait(10).then(() => {
+            mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
+        })
+    }
+
+    private vehicle: mod.Vehicle | null = null
+
+    protected override OnVehicleSpawned(eventVehicle: mod.Vehicle): void {
+        mod.DisplayNotificationMessage(mod.Message(333))
+        this.vehicle = eventVehicle
+    }
+
+    protected override OnLogicalPlayerJoinGame(lp: CorePlayer_APlayer): void {
+        if (lp.isAI()) {
+            mod.Wait(15).then(() => {
+                if (this.vehicle) {
+                    mod.ForcePlayerToSeat(lp.player, this.vehicle, -1)
+                }
+                mod.AIValidatedMoveToBehavior(
+                    lp.player,
+                    mod.GetObjectPosition(mod.GetHQ(1))
+                )
+            })
+        }
+    }
+
+    protected override OnPlayerEarnedKill(
+        eventPlayer: mod.Player,
+        eventOtherPlayer: mod.Player,
+        eventDeathType: mod.DeathType,
+        eventWeaponUnlock: mod.WeaponUnlock
+    ): void {
+        const team = mod.GetTeam(eventPlayer)
+        const otherTeam = mod.GetTeam(eventOtherPlayer)
+
+        if (mod.Equals(team, otherTeam)) {
+            return
+        }
+
+        const teamScore = this.addTeamScore(team, 1)
+
+        mod.SetGameModeScore(team, teamScore)
+    }
+
+    protected override OnPlayerLeaveGame(eventNumber: number): void {
+        const lp = this.playerManager.getById(eventNumber)
+        if (!lp) return
+
+        // Respawn persistent bot
+        if (lp.isPersistentAI()) {
+            this.playerManager.respawnBot(
+                lp,
+                mod.GetObjectPosition(mod.GetHQ(1)),
+                this.AI_UNSPAWN_DELAY
+            )
+        }
+    }
+
+    protected override OngoingGlobal(): void {
+        mod.SetScoreboardHeader(
+            mod.Message(
+                `gamemodes.TDM.scoreboard.team1`,
+                mod.GetGameModeScore(mod.GetTeam(1))
+            ),
+            mod.Message(
+                `gamemodes.TDM.scoreboard.team2`,
+                mod.GetGameModeScore(mod.GetTeam(2))
+            )
+        )
+    }
+
+    private addTeamScore(team: mod.Team, deltaScore: number): number {
+        const teamId = mod.GetObjId(team)
+        const currentScore =
+            this.teamScores.get(teamId) ?? mod.GetGameModeScore(team)
+        const nextScore = currentScore + deltaScore
+        this.teamScores.set(teamId, nextScore)
+        return nextScore
     }
 }
 

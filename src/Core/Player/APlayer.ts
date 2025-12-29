@@ -37,15 +37,17 @@ export abstract class CorePlayer_APlayer {
         )
     }
 
-    isLogicalAI(): boolean {
-        return !!this.aiComp
+    isPersistentAI(): boolean {
+        return !!this.persistentAIComp
     }
 
     /* ------------------------------------------------------------
      * Common component shortcuts
      * ------------------------------------------------------------ */
 
-    public get aiComp(): CorePlayer_PersistentAIComponent | undefined {
+    public get persistentAIComp():
+        | CorePlayer_PersistentAIComponent
+        | undefined {
         return this.getComponent(CorePlayer_PersistentAIComponent)
     }
 

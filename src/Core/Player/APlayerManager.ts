@@ -345,15 +345,15 @@ export class CorePlayer_APlayerManager<
         spawnPos: mod.Vector,
         unspawnDelay: number
     ): void {
-        if (!lp.aiComp) {
+        if (!lp.persistentAIComp) {
             return
         }
 
         this.spawnBot(
-            lp.aiComp.soldierClass,
+            lp.persistentAIComp.soldierClass,
             lp.teamId,
             spawnPos,
-            lp.aiComp.displayName,
+            lp.persistentAIComp.displayName,
             unspawnDelay,
             true,
             lp

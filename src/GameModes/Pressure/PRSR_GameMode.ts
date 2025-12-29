@@ -119,7 +119,7 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
         if (!lp) return
 
         // Respawn persistent bot
-        if (lp.isLogicalAI()) {
+        if (lp.isPersistentAI()) {
             this.playerManager.respawnBot(
                 lp,
                 this.mapData.getBotSpawnPos(this.currentSectorId, lp.teamId),

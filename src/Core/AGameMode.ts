@@ -218,9 +218,7 @@ export abstract class Core_AGameMode<
      *
      */
 
-    protected OnLogicalPlayerJoinGame(
-        logicalPlayer: CorePlayer_APlayer
-    ): void {}
+    protected OnLogicalPlayerJoinGame(lp: CorePlayer_APlayer): void {}
 
     /* ------------------------------------------------------------
      * Internal router: main.ts -> _internal -> PlayerManager + hooks + emit
@@ -859,9 +857,9 @@ export abstract class Core_AGameMode<
          *
          */
 
-        OnLogicalPlayerJoinGame: (logicalPlayer: CorePlayer_APlayer): void => {
-            this.OnLogicalPlayerJoinGame(logicalPlayer)
-            this.emitEngine('OnLogicalPlayerJoinGame', logicalPlayer)
+        OnLogicalPlayerJoinGame: (lp: CorePlayer_APlayer): void => {
+            this.OnLogicalPlayerJoinGame(lp)
+            this.emitEngine('OnLogicalPlayerJoinGame', lp)
         },
     }
 
