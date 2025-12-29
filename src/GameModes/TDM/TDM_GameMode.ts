@@ -35,7 +35,7 @@ export class TDM_GameMode extends Core_AGameMode {
         this.playerManager.spawnBot(
             mod.SoldierClass.Assault,
             1,
-            mod.GetObjectPosition(mod.GetHQ(1)),
+            mod.GetObjectPosition(mod.GetHQ(2)),
             mod.Message(`core.ai.bots.1`),
             this.AI_UNSPAWN_DELAY,
             true
@@ -52,16 +52,15 @@ export class TDM_GameMode extends Core_AGameMode {
 
         const vehicleSpawner = mod.SpawnObject(
             mod.RuntimeSpawn_Common.VehicleSpawner,
-            mod.GetObjectPosition(mod.GetHQ(2)),
+            mod.GetObjectPosition(mod.GetHQ(1)),
             mod.CreateVector(0, 0, 0)
         )
 
-        mod.SetVehicleSpawnerVehicleType(
-            vehicleSpawner,
-            mod.VehicleList.Marauder
-        )
-
         mod.Wait(10).then(() => {
+            mod.SetVehicleSpawnerVehicleType(
+                vehicleSpawner,
+                mod.VehicleList.CV90
+            )
             mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
         })
     }
@@ -69,22 +68,62 @@ export class TDM_GameMode extends Core_AGameMode {
     private vehicle: mod.Vehicle | null = null
 
     protected override OnVehicleSpawned(eventVehicle: mod.Vehicle): void {
-        mod.DisplayNotificationMessage(mod.Message(333))
+        mod.DisplayHighlightedWorldLogMessage(mod.Message(999))
         this.vehicle = eventVehicle
     }
 
-    protected override OnLogicalPlayerJoinGame(lp: CorePlayer_APlayer): void {
-        if (lp.isAI()) {
-            mod.Wait(15).then(() => {
-                if (this.vehicle) {
-                    mod.ForcePlayerToSeat(lp.player, this.vehicle, -1)
-                }
-                mod.AIValidatedMoveToBehavior(
-                    lp.player,
-                    mod.GetObjectPosition(mod.GetHQ(1))
-                )
-            })
+    protected override async OnLogicalPlayerJoinGame(
+        lp: CorePlayer_APlayer
+    ): Promise<void> {
+        await mod.Wait(15)
+        if (lp.isAI() && this.vehicle) {
+            mod.ForcePlayerToSeat(lp.player, this.vehicle, 0)
+
+            // await mod.Wait(5)
+
+            // await mod.Wait(5)
+            // mod.DisplayHighlightedWorldLogMessage(mod.Message(666))
+            // mod.ForcePlayerExitVehicle(lp.player, this.vehicle)
+
+            /* mod.AIDefendPositionBehavior(
+                lp.player,
+                mod.GetObjectPosition(mod.GetHQ(2)),
+                0,
+                20
+            ) */
+            mod.AIValidatedMoveToBehavior(
+                lp.player,
+                mod.GetObjectPosition(mod.GetHQ(2))
+            )
+
+            await mod.Wait(10)
+            mod.DisplayHighlightedWorldLogMessage(mod.Message(666))
+
+            mod.AIValidatedMoveToBehavior(
+                lp.player,
+                mod.GetObjectPosition(mod.GetHQ(1))
+            )
         }
+    }
+
+    protected override async OnAIMoveToSucceeded(
+        eventPlayer: mod.Player
+    ): Promise<void> {
+        if (this.vehicle) {
+            mod.DisplayHighlightedWorldLogMessage(mod.Message(111))
+            mod.ForcePlayerExitVehicle(eventPlayer)
+            await mod.Wait(5)
+            mod.DisplayHighlightedWorldLogMessage(mod.Message(222))
+            mod.ForcePlayerToSeat(eventPlayer, this.vehicle, 0)
+            mod.AIValidatedMoveToBehavior(
+                eventPlayer,
+                mod.GetObjectPosition(mod.GetHQ(1))
+            )
+        }
+    }
+
+    protected override OnAIMoveToFailed(eventPlayer: mod.Player): void {
+        mod.DisplayHighlightedWorldLogMessage(mod.Message(222))
     }
 
     protected override OnPlayerEarnedKill(
