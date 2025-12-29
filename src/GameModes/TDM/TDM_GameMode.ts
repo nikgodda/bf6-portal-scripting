@@ -12,6 +12,7 @@ export class TDM_GameMode extends Core_AGameMode {
         return new TDM_PlayerManager()
     }
 
+    private TARGET_SCORE = 30
     private AI_UNSPAWN_DELAY = 10
     private AI_COUNT_TEAM_1 = 3
     private AI_COUNT_TEAM_2 = 8
@@ -22,7 +23,7 @@ export class TDM_GameMode extends Core_AGameMode {
     protected override OnGameModeStarted(): void {
         mod.SetAIToHumanDamageModifier(2)
 
-        mod.SetGameModeTargetScore(100)
+        mod.SetGameModeTargetScore(this.TARGET_SCORE)
 
         mod.SetScoreboardType(mod.ScoreboardType.CustomTwoTeams)
         mod.SetScoreboardColumnNames(
@@ -34,31 +35,29 @@ export class TDM_GameMode extends Core_AGameMode {
         )
         mod.SetScoreboardColumnWidths(1, 0.5, 0.5, 0.5, 0.5)
 
-        mod.Wait(5).then(() => {
-            for (let i = 1; i <= this.AI_COUNT_TEAM_1; i++) {
-                mod.Wait(0.5).then(() =>
-                    this.playerManager.spawnLogicalBot(
-                        mod.SoldierClass.Assault,
-                        1,
-                        mod.GetObjectPosition(mod.GetHQ(1)),
-                        mod.Message(`core.ai.bots.${i}`),
-                        this.AI_UNSPAWN_DELAY
-                    )
+        for (let i = 1; i <= this.AI_COUNT_TEAM_1; i++) {
+            mod.Wait(0.5).then(() =>
+                this.playerManager.spawnLogicalBot(
+                    mod.SoldierClass.Assault,
+                    1,
+                    mod.GetObjectPosition(mod.GetHQ(1)),
+                    mod.Message(`core.ai.bots.${i}`),
+                    this.AI_UNSPAWN_DELAY
                 )
-            }
+            )
+        }
 
-            for (let j = 1; j <= this.AI_COUNT_TEAM_2; j++) {
-                mod.Wait(0.5).then(() =>
-                    this.playerManager.spawnLogicalBot(
-                        mod.SoldierClass.Assault,
-                        2,
-                        mod.GetObjectPosition(mod.GetHQ(2)),
-                        mod.Message(`core.ai.bots.${this.AI_COUNT_TEAM_1 + j}`),
-                        this.AI_UNSPAWN_DELAY
-                    )
+        for (let j = 1; j <= this.AI_COUNT_TEAM_2; j++) {
+            mod.Wait(0.5).then(() =>
+                this.playerManager.spawnLogicalBot(
+                    mod.SoldierClass.Assault,
+                    2,
+                    mod.GetObjectPosition(mod.GetHQ(2)),
+                    mod.Message(`core.ai.bots.${this.AI_COUNT_TEAM_1 + j}`),
+                    this.AI_UNSPAWN_DELAY
                 )
-            }
-        })
+            )
+        }
     }
 
     protected override OnLogicalPlayerJoinGame(lp: CorePlayer_APlayer): void {
@@ -66,11 +65,16 @@ export class TDM_GameMode extends Core_AGameMode {
         if (lp.isLogicalAI()) {
             const brain = new CoreAI_Brain(
                 lp.player,
-                new CoreAI_CombatantProfile(
-                    () => [],
-                    () => this.getRoamWps(1000, 1010),
-                    () => []
-                )
+                new CoreAI_CombatantProfile({
+                    moveToSensor: {
+                        getRoamWPs: () => this.getRoamWps(1000, 1010),
+                    },
+                    arrivalSensor: {
+                        getDefendWPs: () => this.getRoamWps(1000, 1010),
+                        ttlMs: 4000,
+                    },
+                }),
+                false
             )
 
             lp.addComponent(new BrainComponent(brain))
@@ -119,11 +123,13 @@ export class TDM_GameMode extends Core_AGameMode {
         mod.SetScoreboardHeader(
             mod.Message(
                 `gamemodes.TDM.scoreboard.team1`,
-                mod.GetGameModeScore(mod.GetTeam(1))
+                mod.GetGameModeScore(mod.GetTeam(1)),
+                this.TARGET_SCORE
             ),
             mod.Message(
                 `gamemodes.TDM.scoreboard.team2`,
-                mod.GetGameModeScore(mod.GetTeam(2))
+                mod.GetGameModeScore(mod.GetTeam(2)),
+                this.TARGET_SCORE
             )
         )
     }

@@ -108,8 +108,8 @@
     },
     "TDM": {
       "scoreboard": {
-        "team1": "Team1 {}",
-        "team2": "Team2 {}"
+        "team1": "Team1 {}/{}",
+        "team2": "Team2 {}/{}"
       }
     }
   }

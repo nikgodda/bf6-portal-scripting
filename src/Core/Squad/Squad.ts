@@ -84,7 +84,9 @@ export class CoreAI_Squad {
         }
 
         // Assign follower profile
-        const profile = new CoreAI_FollowerProfile(() => this.getSquadPoint())
+        const profile = new CoreAI_FollowerProfile({
+            getPoint: () => this.getSquadPoint(),
+        })
         brainComp.brain.installProfile(profile)
     }
 
@@ -94,6 +96,14 @@ export class CoreAI_Squad {
 
     private getSquadPoint(): mod.Vector | null {
         if (this.leader) {
+            if (
+                !mod.GetSoldierState(
+                    this.leader.player,
+                    mod.SoldierStateBool.IsAlive
+                )
+            ) {
+                return null
+            }
             return mod.GetObjectPosition(this.leader.player)
         }
         return null

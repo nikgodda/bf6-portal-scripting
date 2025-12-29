@@ -11,9 +11,33 @@ import { ArrivalSensor } from '../Modules/Perception/Sensors/ArrivalSensor'
 import { CoreAI_ClosestEnemyBehavior } from '../Modules/Behavior/Behaviors/ClosestEnemyBehavior'
 import { CoreAI_ClosestEnemySensor } from '../Modules/Perception/Sensors/ClosestEnemySensor'
 
+export interface CoreAI_FollowerProfileOptions {
+    getPoint?: () => mod.Vector | null
+    fightSensor?: {
+        intervalMs?: number
+        ttlMs?: number
+    }
+    closestEnemySensor?: {
+        sensitivity?: number
+        intervalMs?: number
+        ttlMs?: number
+    }
+    arrivalSensor?: {
+        intervalMs?: number
+        distanceThreshold?: number
+        ttlMs?: number
+        cooldownMs?: number
+    }
+    followBehavior?: {
+        intervalMs?: number
+    }
+}
+
 export class CoreAI_FollowerProfile extends CoreAI_AProfile {
-    constructor(private readonly getPoint: () => mod.Vector | null) {
+    constructor(private readonly options: CoreAI_FollowerProfileOptions = {}) {
         super()
+
+        const getPoint = options.getPoint ?? (() => null)
 
         this.scoring = [
             // Fight has top priority
@@ -55,7 +79,7 @@ export class CoreAI_FollowerProfile extends CoreAI_AProfile {
             // Follow (always enabled)
             {
                 score: (brain) => {
-                    const target = this.getPoint()
+                    const target = getPoint()
                     if (!target) return 0
 
                     const myPos = mod.GetObjectPosition(brain.player)
@@ -74,7 +98,11 @@ export class CoreAI_FollowerProfile extends CoreAI_AProfile {
                     return 50
                 },
                 factory: (brain) => {
-                    return new CoreAI_FollowBehavior(brain, this.getPoint, 4000)
+                    return new CoreAI_FollowBehavior(
+                        brain,
+                        getPoint,
+                        options.followBehavior?.intervalMs
+                    )
                 },
             },
 
@@ -85,20 +113,29 @@ export class CoreAI_FollowerProfile extends CoreAI_AProfile {
         ] as CoreAI_ITaskScoringEntry[]
 
         this.sensors = [
-            () => new CoreAI_FightSensor(),
-            () => new CoreAI_ClosestEnemySensor(),
+            () =>
+                new CoreAI_FightSensor(
+                    options.fightSensor?.intervalMs,
+                    options.fightSensor?.ttlMs
+                ),
+            () =>
+                new CoreAI_ClosestEnemySensor(
+                    options.closestEnemySensor?.sensitivity,
+                    options.closestEnemySensor?.intervalMs,
+                    options.closestEnemySensor?.ttlMs
+                ),
 
             // Arrival sensor only
             () =>
                 new ArrivalSensor(
                     () => {
-                        const p = this.getPoint()
+                        const p = getPoint()
                         return p ? [p] : []
                     },
-                    1000,
-                    6.0,
-                    4000,
-                    0
+                    options.arrivalSensor?.intervalMs,
+                    options.arrivalSensor?.distanceThreshold,
+                    options.arrivalSensor?.ttlMs,
+                    options.arrivalSensor?.cooldownMs
                 ),
         ]
     }

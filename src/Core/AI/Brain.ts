@@ -42,7 +42,11 @@ export class CoreAI_Brain {
     private debugWI: CoreAI_DebugWI | null = null
     private listeners: CoreAI_IBrainEvents[] = []
 
-    constructor(player: mod.Player, profile: CoreAI_AProfile) {
+    constructor(
+        player: mod.Player,
+        profile: CoreAI_AProfile,
+        enableDebug: boolean = false
+    ) {
         this.player = player
 
         this.memory = new CoreAI_MemoryManager()
@@ -50,7 +54,11 @@ export class CoreAI_Brain {
         this.behaviorController = new CoreAI_BehaviorController(this)
         this.taskSelector = new CoreAI_TaskSelector(this, profile)
 
-        // this.debugWI = new CoreAI_DebugWI(mod.FirstOf(mod.AllPlayers()), this)
+        if (enableDebug)
+            this.debugWI = new CoreAI_DebugWI(
+                mod.FirstOf(mod.AllPlayers()),
+                this
+            )
 
         this.installProfile(profile)
     }

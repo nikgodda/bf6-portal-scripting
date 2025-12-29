@@ -12,12 +12,37 @@ import { ArrivalSensor } from '../Modules/Perception/Sensors/ArrivalSensor'
 import { MoveToSensor } from '../Modules/Perception/Sensors/MoveToSensor'
 import { MoveToCapturePointSensor } from '../Modules/Perception/Sensors/MoveToCapturePointSensor'
 
+export interface CoreAI_CombatantProfileOptions {
+    fightSensor?: {
+        intervalMs?: number
+        ttlMs?: number
+    }
+    closestEnemySensor?: {
+        sensitivity?: number
+        intervalMs?: number
+        ttlMs?: number
+    }
+    arrivalSensor?: {
+        getDefendWPs?: () => mod.Vector[]
+        intervalMs?: number
+        distanceThreshold?: number
+        ttlMs?: number
+        cooldownMs?: number
+    }
+    moveToSensor?: {
+        getRoamWPs?: () => mod.Vector[]
+        intervalMs?: number
+        ttlMs?: number
+    }
+    moveToCapturePointSensor?: {
+        getCapturePoints?: () => mod.CapturePoint[]
+        intervalMs?: number
+        ttlMs?: number
+    }
+}
+
 export class CoreAI_CombatantProfile extends CoreAI_AProfile {
-    constructor(
-        private readonly getDefendWPs: () => mod.Vector[],
-        private readonly getRoamWPs: () => mod.Vector[],
-        private readonly getCapturePoints: () => mod.CapturePoint[]
-    ) {
+    constructor(options: CoreAI_CombatantProfileOptions = {}) {
         super()
 
         this.scoring = [
@@ -64,20 +89,54 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
         ] as CoreAI_ITaskScoringEntry[]
 
         this.sensors = [
-            () => new CoreAI_FightSensor(),
-            () => new CoreAI_ClosestEnemySensor(),
-
             () =>
-                new ArrivalSensor(
-                    () => this.getDefendWPs(),
-                    500,
-                    6.0,
-                    10000,
-                    15000
+                new CoreAI_FightSensor(
+                    options.fightSensor?.intervalMs,
+                    options.fightSensor?.ttlMs
                 ),
-
-            () => new MoveToCapturePointSensor(() => this.getCapturePoints()),
-            () => new MoveToSensor(() => this.getRoamWPs()),
+            () =>
+                new CoreAI_ClosestEnemySensor(
+                    options.closestEnemySensor?.sensitivity,
+                    options.closestEnemySensor?.intervalMs,
+                    options.closestEnemySensor?.ttlMs
+                ),
         ]
+
+        if (options.arrivalSensor?.getDefendWPs) {
+            this.sensors.push(
+                () =>
+                    new ArrivalSensor(
+                        () => options.arrivalSensor!.getDefendWPs!(), 
+                        options.arrivalSensor?.intervalMs,
+                        options.arrivalSensor?.distanceThreshold,
+                        options.arrivalSensor?.ttlMs,
+                        options.arrivalSensor?.cooldownMs
+                    )
+            )
+        }
+
+        if (options.moveToCapturePointSensor?.getCapturePoints) {
+            this.sensors.push(
+                () =>
+                    new MoveToCapturePointSensor(
+                        () =>
+                            options.moveToCapturePointSensor!
+                                .getCapturePoints!(),
+                        options.moveToCapturePointSensor?.intervalMs,
+                        options.moveToCapturePointSensor?.ttlMs
+                    )
+            )
+        }
+
+        if (options.moveToSensor?.getRoamWPs) {
+            this.sensors.push(
+                () =>
+                    new MoveToSensor(
+                        () => options.moveToSensor!.getRoamWPs!(),
+                        options.moveToSensor?.intervalMs,
+                        options.moveToSensor?.ttlMs
+                    )
+            )
+        }
     }
 }

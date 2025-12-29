@@ -2756,7 +2756,11 @@ export class CoreAI_Brain {
     private debugWI: CoreAI_DebugWI | null = null
     private listeners: CoreAI_IBrainEvents[] = []
 
-    constructor(player: mod.Player, profile: CoreAI_AProfile) {
+    constructor(
+        player: mod.Player,
+        profile: CoreAI_AProfile,
+        enableDebug: boolean = false
+    ) {
         this.player = player
 
         this.memory = new CoreAI_MemoryManager()
@@ -2764,7 +2768,11 @@ export class CoreAI_Brain {
         this.behaviorController = new CoreAI_BehaviorController(this)
         this.taskSelector = new CoreAI_TaskSelector(this, profile)
 
-        // this.debugWI = new CoreAI_DebugWI(mod.FirstOf(mod.AllPlayers()), this)
+        if (enableDebug)
+            this.debugWI = new CoreAI_DebugWI(
+                mod.FirstOf(mod.AllPlayers()),
+                this
+            )
 
         this.installProfile(profile)
     }
@@ -3517,12 +3525,37 @@ export class MoveToCapturePointSensor extends CoreAI_ASensor {
 }
 
 // -------- FILE: src\Core\AI\Profiles\CombatantProfile.ts --------
+export interface CoreAI_CombatantProfileOptions {
+    fightSensor?: {
+        intervalMs?: number
+        ttlMs?: number
+    }
+    closestEnemySensor?: {
+        sensitivity?: number
+        intervalMs?: number
+        ttlMs?: number
+    }
+    arrivalSensor?: {
+        getDefendWPs?: () => mod.Vector[]
+        intervalMs?: number
+        distanceThreshold?: number
+        ttlMs?: number
+        cooldownMs?: number
+    }
+    moveToSensor?: {
+        getRoamWPs?: () => mod.Vector[]
+        intervalMs?: number
+        ttlMs?: number
+    }
+    moveToCapturePointSensor?: {
+        getCapturePoints?: () => mod.CapturePoint[]
+        intervalMs?: number
+        ttlMs?: number
+    }
+}
+
 export class CoreAI_CombatantProfile extends CoreAI_AProfile {
-    constructor(
-        private readonly getDefendWPs: () => mod.Vector[],
-        private readonly getRoamWPs: () => mod.Vector[],
-        private readonly getCapturePoints: () => mod.CapturePoint[]
-    ) {
+    constructor(options: CoreAI_CombatantProfileOptions = {}) {
         super()
 
         this.scoring = [
@@ -3569,21 +3602,55 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
         ] as CoreAI_ITaskScoringEntry[]
 
         this.sensors = [
-            () => new CoreAI_FightSensor(),
-            () => new CoreAI_ClosestEnemySensor(),
-
             () =>
-                new ArrivalSensor(
-                    () => this.getDefendWPs(),
-                    500,
-                    6.0,
-                    10000,
-                    15000
+                new CoreAI_FightSensor(
+                    options.fightSensor?.intervalMs,
+                    options.fightSensor?.ttlMs
                 ),
-
-            () => new MoveToCapturePointSensor(() => this.getCapturePoints()),
-            () => new MoveToSensor(() => this.getRoamWPs()),
+            () =>
+                new CoreAI_ClosestEnemySensor(
+                    options.closestEnemySensor?.sensitivity,
+                    options.closestEnemySensor?.intervalMs,
+                    options.closestEnemySensor?.ttlMs
+                ),
         ]
+
+        if (options.arrivalSensor?.getDefendWPs) {
+            this.sensors.push(
+                () =>
+                    new ArrivalSensor(
+                        () => options.arrivalSensor!.getDefendWPs!(),
+                        options.arrivalSensor?.intervalMs,
+                        options.arrivalSensor?.distanceThreshold,
+                        options.arrivalSensor?.ttlMs,
+                        options.arrivalSensor?.cooldownMs
+                    )
+            )
+        }
+
+        if (options.moveToCapturePointSensor?.getCapturePoints) {
+            this.sensors.push(
+                () =>
+                    new MoveToCapturePointSensor(
+                        () =>
+                            options.moveToCapturePointSensor!
+                                .getCapturePoints!(),
+                        options.moveToCapturePointSensor?.intervalMs,
+                        options.moveToCapturePointSensor?.ttlMs
+                    )
+            )
+        }
+
+        if (options.moveToSensor?.getRoamWPs) {
+            this.sensors.push(
+                () =>
+                    new MoveToSensor(
+                        () => options.moveToSensor!.getRoamWPs!(),
+                        options.moveToSensor?.intervalMs,
+                        options.moveToSensor?.ttlMs
+                    )
+            )
+        }
     }
 }
 
@@ -3692,9 +3759,33 @@ export class CoreAI_FollowBehavior extends CoreAI_ABehavior {
 }
 
 // -------- FILE: src\Core\AI\Profiles\FollowerProfile.ts --------
+export interface CoreAI_FollowerProfileOptions {
+    getPoint?: () => mod.Vector | null
+    fightSensor?: {
+        intervalMs?: number
+        ttlMs?: number
+    }
+    closestEnemySensor?: {
+        sensitivity?: number
+        intervalMs?: number
+        ttlMs?: number
+    }
+    arrivalSensor?: {
+        intervalMs?: number
+        distanceThreshold?: number
+        ttlMs?: number
+        cooldownMs?: number
+    }
+    followBehavior?: {
+        intervalMs?: number
+    }
+}
+
 export class CoreAI_FollowerProfile extends CoreAI_AProfile {
-    constructor(private readonly getPoint: () => mod.Vector | null) {
+    constructor(private readonly options: CoreAI_FollowerProfileOptions = {}) {
         super()
+
+        const getPoint = options.getPoint ?? (() => null)
 
         this.scoring = [
             // Fight has top priority
@@ -3736,7 +3827,7 @@ export class CoreAI_FollowerProfile extends CoreAI_AProfile {
             // Follow (always enabled)
             {
                 score: (brain) => {
-                    const target = this.getPoint()
+                    const target = getPoint()
                     if (!target) return 0
 
                     const myPos = mod.GetObjectPosition(brain.player)
@@ -3755,7 +3846,11 @@ export class CoreAI_FollowerProfile extends CoreAI_AProfile {
                     return 50
                 },
                 factory: (brain) => {
-                    return new CoreAI_FollowBehavior(brain, this.getPoint, 4000)
+                    return new CoreAI_FollowBehavior(
+                        brain,
+                        getPoint,
+                        options.followBehavior?.intervalMs
+                    )
                 },
             },
 
@@ -3766,20 +3861,29 @@ export class CoreAI_FollowerProfile extends CoreAI_AProfile {
         ] as CoreAI_ITaskScoringEntry[]
 
         this.sensors = [
-            () => new CoreAI_FightSensor(),
-            () => new CoreAI_ClosestEnemySensor(),
+            () =>
+                new CoreAI_FightSensor(
+                    options.fightSensor?.intervalMs,
+                    options.fightSensor?.ttlMs
+                ),
+            () =>
+                new CoreAI_ClosestEnemySensor(
+                    options.closestEnemySensor?.sensitivity,
+                    options.closestEnemySensor?.intervalMs,
+                    options.closestEnemySensor?.ttlMs
+                ),
 
             // Arrival sensor only
             () =>
                 new ArrivalSensor(
                     () => {
-                        const p = this.getPoint()
+                        const p = getPoint()
                         return p ? [p] : []
                     },
-                    1000,
-                    6.0,
-                    4000,
-                    0
+                    options.arrivalSensor?.intervalMs,
+                    options.arrivalSensor?.distanceThreshold,
+                    options.arrivalSensor?.ttlMs,
+                    options.arrivalSensor?.cooldownMs
                 ),
         ]
     }
@@ -3867,7 +3971,9 @@ export class CoreAI_Squad {
         }
 
         // Assign follower profile
-        const profile = new CoreAI_FollowerProfile(() => this.getSquadPoint())
+        const profile = new CoreAI_FollowerProfile({
+            getPoint: () => this.getSquadPoint(),
+        })
         brainComp.brain.installProfile(profile)
     }
 
@@ -3877,6 +3983,14 @@ export class CoreAI_Squad {
 
     private getSquadPoint(): mod.Vector | null {
         if (this.leader) {
+            if (
+                !mod.GetSoldierState(
+                    this.leader.player,
+                    mod.SoldierStateBool.IsAlive
+                )
+            ) {
+                return null
+            }
             return mod.GetObjectPosition(this.leader.player)
         }
         return null
@@ -3949,6 +4063,7 @@ export class TDM_GameMode extends Core_AGameMode {
         return new TDM_PlayerManager()
     }
 
+    private TARGET_SCORE = 30
     private AI_UNSPAWN_DELAY = 10
     private AI_COUNT_TEAM_1 = 3
     private AI_COUNT_TEAM_2 = 8
@@ -3959,7 +4074,7 @@ export class TDM_GameMode extends Core_AGameMode {
     protected override OnGameModeStarted(): void {
         mod.SetAIToHumanDamageModifier(2)
 
-        mod.SetGameModeTargetScore(100)
+        mod.SetGameModeTargetScore(this.TARGET_SCORE)
 
         mod.SetScoreboardType(mod.ScoreboardType.CustomTwoTeams)
         mod.SetScoreboardColumnNames(
@@ -3971,31 +4086,29 @@ export class TDM_GameMode extends Core_AGameMode {
         )
         mod.SetScoreboardColumnWidths(1, 0.5, 0.5, 0.5, 0.5)
 
-        mod.Wait(5).then(() => {
-            for (let i = 1; i <= this.AI_COUNT_TEAM_1; i++) {
-                mod.Wait(0.5).then(() =>
-                    this.playerManager.spawnLogicalBot(
-                        mod.SoldierClass.Assault,
-                        1,
-                        mod.GetObjectPosition(mod.GetHQ(1)),
-                        mod.Message(`core.ai.bots.${i}`),
-                        this.AI_UNSPAWN_DELAY
-                    )
+        for (let i = 1; i <= this.AI_COUNT_TEAM_1; i++) {
+            mod.Wait(0.5).then(() =>
+                this.playerManager.spawnLogicalBot(
+                    mod.SoldierClass.Assault,
+                    1,
+                    mod.GetObjectPosition(mod.GetHQ(1)),
+                    mod.Message(`core.ai.bots.${i}`),
+                    this.AI_UNSPAWN_DELAY
                 )
-            }
+            )
+        }
 
-            for (let j = 1; j <= this.AI_COUNT_TEAM_2; j++) {
-                mod.Wait(0.5).then(() =>
-                    this.playerManager.spawnLogicalBot(
-                        mod.SoldierClass.Assault,
-                        2,
-                        mod.GetObjectPosition(mod.GetHQ(2)),
-                        mod.Message(`core.ai.bots.${this.AI_COUNT_TEAM_1 + j}`),
-                        this.AI_UNSPAWN_DELAY
-                    )
+        for (let j = 1; j <= this.AI_COUNT_TEAM_2; j++) {
+            mod.Wait(0.5).then(() =>
+                this.playerManager.spawnLogicalBot(
+                    mod.SoldierClass.Assault,
+                    2,
+                    mod.GetObjectPosition(mod.GetHQ(2)),
+                    mod.Message(`core.ai.bots.${this.AI_COUNT_TEAM_1 + j}`),
+                    this.AI_UNSPAWN_DELAY
                 )
-            }
-        })
+            )
+        }
     }
 
     protected override OnLogicalPlayerJoinGame(lp: CorePlayer_APlayer): void {
@@ -4003,11 +4116,16 @@ export class TDM_GameMode extends Core_AGameMode {
         if (lp.isLogicalAI()) {
             const brain = new CoreAI_Brain(
                 lp.player,
-                new CoreAI_CombatantProfile(
-                    () => [],
-                    () => this.getRoamWps(1000, 1010),
-                    () => []
-                )
+                new CoreAI_CombatantProfile({
+                    moveToSensor: {
+                        getRoamWPs: () => this.getRoamWps(1000, 1010),
+                    },
+                    arrivalSensor: {
+                        getDefendWPs: () => this.getRoamWps(1000, 1010),
+                        ttlMs: 4000,
+                    },
+                }),
+                false
             )
 
             lp.addComponent(new BrainComponent(brain))
@@ -4056,11 +4174,13 @@ export class TDM_GameMode extends Core_AGameMode {
         mod.SetScoreboardHeader(
             mod.Message(
                 `gamemodes.TDM.scoreboard.team1`,
-                mod.GetGameModeScore(mod.GetTeam(1))
+                mod.GetGameModeScore(mod.GetTeam(1)),
+                this.TARGET_SCORE
             ),
             mod.Message(
                 `gamemodes.TDM.scoreboard.team2`,
-                mod.GetGameModeScore(mod.GetTeam(2))
+                mod.GetGameModeScore(mod.GetTeam(2)),
+                this.TARGET_SCORE
             )
         )
     }
