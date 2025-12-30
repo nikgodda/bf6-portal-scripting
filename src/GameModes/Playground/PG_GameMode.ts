@@ -13,7 +13,7 @@ export class PG_GameMode extends Core_AGameMode {
     }
 
     private AI_UNSPAWN_DELAY = 10
-    private AI_COUNT_TEAM_1 = 0
+    private AI_COUNT_TEAM_1 = 1
     private AI_COUNT_TEAM_2 = 1
 
     private squadManager: Core_SquadManager | null = null
@@ -21,12 +21,13 @@ export class PG_GameMode extends Core_AGameMode {
     protected override OnGameModeStarted(): void {
         // One-time game setup (rules, scoreboard, AI bootstrap)
         mod.SetAIToHumanDamageModifier(2)
+        mod.SetFriendlyFire(true)
 
         // Spawn initial logical bots
         for (let i = 1; i <= this.AI_COUNT_TEAM_1; i++) {
-            mod.Wait(0.5).then(() =>
+            mod.Wait(1).then(() =>
                 this.playerManager.spawnLogicalBot(
-                    mod.SoldierClass.Assault,
+                    mod.SoldierClass.Engineer,
                     1,
                     mod.GetObjectPosition(mod.GetHQ(1)),
                     mod.Message(`core.ai.bots.${i}`),
@@ -36,10 +37,10 @@ export class PG_GameMode extends Core_AGameMode {
         }
 
         for (let j = 1; j <= this.AI_COUNT_TEAM_2; j++) {
-            mod.Wait(0.5).then(() =>
+            mod.Wait(1).then(() =>
                 this.playerManager.spawnLogicalBot(
-                    mod.SoldierClass.Assault,
-                    1,
+                    mod.SoldierClass.Engineer,
+                    2,
                     mod.GetObjectPosition(mod.GetHQ(2)),
                     mod.Message(`core.ai.bots.${this.AI_COUNT_TEAM_1 + j}`),
                     this.AI_UNSPAWN_DELAY
@@ -55,6 +56,9 @@ export class PG_GameMode extends Core_AGameMode {
             mod.GetObjectPosition(mod.GetHQ(1)),
             mod.CreateVector(0, 0, 0)
         )
+
+        mod.SetVehicleSpawnerVehicleType(vehicleSpawner, mod.VehicleList.Abrams)
+        mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
 
         // mod.Wait(7).then(() => {
         mod.SetVehicleSpawnerVehicleType(vehicleSpawner, mod.VehicleList.Abrams)
@@ -72,9 +76,10 @@ export class PG_GameMode extends Core_AGameMode {
         this.vehicle = eventVehicle
     }
 
-    protected override OnPlayerExitVehicle(eventPlayer: mod.Player, eventVehicle: mod.Vehicle): void {
-        
-    }
+    protected override OnPlayerExitVehicle(
+        eventPlayer: mod.Player,
+        eventVehicle: mod.Vehicle
+    ): void {}
 
     /*
      *
@@ -83,28 +88,25 @@ export class PG_GameMode extends Core_AGameMode {
     protected override async OnLogicalPlayerJoinGame(
         lp: CorePlayer_APlayer
     ): Promise<void> {
-        await mod.Wait(5)
-        mod.ForcePlayerToSeat(lp.player, this.vehicle!, 0)
-
-        await mod.Wait(3)
-
         // if (2 > 1) return
 
         // Attach AI brain to logical AI players only
         if (lp.isLogicalAI()) {
+            if (lp.teamId === 1) {
+                await mod.Wait(5)
+                mod.ForcePlayerToSeat(lp.player, this.vehicle!, -1)
+            }
+
             const brain = new CoreAI_Brain(
                 lp.player,
                 new CoreAI_CombatantProfile({
-                    moveToSensor: {
-                        getRoamWPs: () => [
-                            /* mod.GetObjectPosition(mod.GetHQ(1)),
-                            mod.GetObjectPosition(mod.GetHQ(2)), */
-                            mod.CreateVector(-472.182, 179.832, -676.411),
-                            mod.CreateVector(-351.424, 192.489, -731.139),
-                            mod.CreateVector(-403.488, 187.611, -526.54),
-                            mod.CreateVector(-303.344, 181.145, -519.643),
+                    vehicleMoveToSensor: {
+                        getVehicleWPs: () => /* this.getRoamWps(1100, 1105) */ [
+                            mod.GetObjectPosition(mod.GetHQ(1)),
+                            mod.GetObjectPosition(mod.GetHQ(3)),
+                            mod.GetObjectPosition(mod.GetHQ(4)),
                         ],
-                        ttlMs: 10000,
+                        ttlMs: 20000,
                     },
                     arrivalSensor: {
                         getDefendWPs: () => [],

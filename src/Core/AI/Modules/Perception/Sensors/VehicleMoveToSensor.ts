@@ -11,7 +11,7 @@ import { CoreAI_SensorContext } from './SensorContext'
  * - Velocity is preferred when speed > threshold.
  * - Intent direction stabilizes steering across replans.
  */
-export class CoreAI_MoveToSensor extends CoreAI_ASensor {
+export class CoreAI_VehicleMoveToSensor extends CoreAI_ASensor {
     private readonly ttlMs: number
 
     private coldStart: boolean = true
@@ -45,23 +45,27 @@ export class CoreAI_MoveToSensor extends CoreAI_ASensor {
 
         const myPos = mod.GetObjectPosition(player)
 
+        const vehicle = mod.GetVehicleFromPlayer(player)
+        if (!vehicle) return
+        const driver = mod.GetPlayerFromVehicleSeat(vehicle, 0)
+        if (!mod.IsPlayerValid(driver) || !mod.Equals(driver, player)) return
+
         // ------------------------------------------------------------
-        // Resolve forward direction
+        // Resolve forward direction (vehicle)
         // ------------------------------------------------------------
 
-        const speed = mod.GetSoldierState(player, mod.SoldierStateNumber.Speed)
+        const vel = mod.GetVehicleState(
+            vehicle,
+            mod.VehicleStateVector.LinearVelocity
+        )
+        const speedSq = mod.DotProduct(vel, vel)
+        const speed = Math.sqrt(speedSq)
 
         let forward: mod.Vector | null = null
 
         // 1. True movement direction
         if (speed > 0.3) {
-            const vel = mod.GetSoldierState(
-                player,
-                mod.SoldierStateVector.GetLinearVelocity
-            )
-            const lenSq = mod.DotProduct(vel, vel)
-
-            if (lenSq > 0.1) {
+            if (speedSq > 0.1) {
                 forward = mod.Normalize(vel)
                 this.lastIntentDir = forward
             }
@@ -74,9 +78,9 @@ export class CoreAI_MoveToSensor extends CoreAI_ASensor {
 
         // 3. Facing fallback
         if (!forward) {
-            const face = mod.GetSoldierState(
-                player,
-                mod.SoldierStateVector.GetFacingDirection
+            const face = mod.GetVehicleState(
+                vehicle,
+                mod.VehicleStateVector.FacingDirection
             )
             forward = mod.Normalize(face)
             this.lastIntentDir = forward
@@ -92,7 +96,7 @@ export class CoreAI_MoveToSensor extends CoreAI_ASensor {
             dot: number
         }[] = []
 
-        const ARRIVAL_EXCLUDE_DIST = 3.0
+        const ARRIVAL_EXCLUDE_DIST = 10.0
 
         for (const pos of points) {
             const dist = mod.DistanceBetween(myPos, pos)

@@ -8,9 +8,10 @@ import { CoreAI_MoveToBehavior } from '../Modules/Behavior/Behaviors/MoveToBehav
 
 import { CoreAI_FightSensor } from '../Modules/Perception/Sensors/FightSensor'
 import { CoreAI_ClosestEnemySensor } from '../Modules/Perception/Sensors/ClosestEnemySensor'
-import { ArrivalSensor } from '../Modules/Perception/Sensors/ArrivalSensor'
-import { MoveToSensor } from '../Modules/Perception/Sensors/MoveToSensor'
-import { MoveToCapturePointSensor } from '../Modules/Perception/Sensors/MoveToCapturePointSensor'
+import { CoreAI_ArrivalSensor } from '../Modules/Perception/Sensors/ArrivalSensor'
+import { CoreAI_MoveToSensor } from '../Modules/Perception/Sensors/MoveToSensor'
+import { CoreAI_MoveToCapturePointSensor } from '../Modules/Perception/Sensors/MoveToCapturePointSensor'
+import { CoreAI_VehicleMoveToSensor } from '../Modules/Perception/Sensors/VehicleMoveToSensor'
 
 export interface CoreAI_CombatantProfileOptions {
     fightSensor?: {
@@ -31,6 +32,11 @@ export interface CoreAI_CombatantProfileOptions {
     }
     moveToSensor?: {
         getRoamWPs?: () => mod.Vector[]
+        intervalMs?: number
+        ttlMs?: number
+    }
+    vehicleMoveToSensor?: {
+        getVehicleWPs?: () => mod.Vector[]
         intervalMs?: number
         ttlMs?: number
     }
@@ -105,7 +111,7 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
         if (options.arrivalSensor?.getDefendWPs) {
             this.sensors.push(
                 () =>
-                    new ArrivalSensor(
+                    new CoreAI_ArrivalSensor(
                         () => options.arrivalSensor!.getDefendWPs!(),
                         options.arrivalSensor?.intervalMs,
                         options.arrivalSensor?.distanceThreshold,
@@ -118,7 +124,7 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
         if (options.moveToCapturePointSensor?.getCapturePoints) {
             this.sensors.push(
                 () =>
-                    new MoveToCapturePointSensor(
+                    new CoreAI_MoveToCapturePointSensor(
                         () =>
                             options.moveToCapturePointSensor!
                                 .getCapturePoints!(),
@@ -131,10 +137,21 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
         if (options.moveToSensor?.getRoamWPs) {
             this.sensors.push(
                 () =>
-                    new MoveToSensor(
+                    new CoreAI_MoveToSensor(
                         () => options.moveToSensor!.getRoamWPs!(),
                         options.moveToSensor?.intervalMs,
                         options.moveToSensor?.ttlMs
+                    )
+            )
+        }
+
+        if (options.vehicleMoveToSensor?.getVehicleWPs) {
+            this.sensors.push(
+                () =>
+                    new CoreAI_VehicleMoveToSensor(
+                        () => options.vehicleMoveToSensor!.getVehicleWPs!(),
+                        options.vehicleMoveToSensor?.intervalMs,
+                        options.vehicleMoveToSensor?.ttlMs
                     )
             )
         }

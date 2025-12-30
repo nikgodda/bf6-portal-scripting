@@ -23,6 +23,13 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
 
     override async enter(): Promise<void> {
         mod.DisplayHighlightedWorldLogMessage(mod.Message(202))
+        console.log(
+            mod.XComponentOf(this.targetPos),
+            ' ',
+            mod.YComponentOf(this.targetPos),
+            ' ',
+            mod.ZComponentOf(this.targetPos)
+        )
 
         const player = this.brain.player
         if (!mod.IsPlayerValid(player)) return
@@ -31,10 +38,11 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
         const driver = mod.GetPlayerFromVehicleSeat(vehicle, 0)
         if (mod.IsPlayerValid(driver) && mod.Equals(driver, player)) {
             mod.ForcePlayerExitVehicle(player, vehicle)
-            await mod.Wait(0.1)
+            await mod.Wait(0)
+            await mod.Wait(0)
             mod.ForcePlayerToSeat(player, vehicle, 0)
-            // mod.AIDefendPositionBehavior(player, this.targetPos, 0, 20)
-            mod.AIValidatedMoveToBehavior(player, this.targetPos)
+            mod.AIDefendPositionBehavior(player, this.targetPos, 0, 10)
+            // mod.AIValidatedMoveToBehavior(player, this.targetPos)
 
             return
         }

@@ -2891,6 +2891,13 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
 
     override async enter(): Promise<void> {
         mod.DisplayHighlightedWorldLogMessage(mod.Message(202))
+        console.log(
+            mod.XComponentOf(this.targetPos),
+            ' ',
+            mod.YComponentOf(this.targetPos),
+            ' ',
+            mod.ZComponentOf(this.targetPos)
+        )
 
         const player = this.brain.player
         if (!mod.IsPlayerValid(player)) return
@@ -2899,10 +2906,11 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
         const driver = mod.GetPlayerFromVehicleSeat(vehicle, 0)
         if (mod.IsPlayerValid(driver) && mod.Equals(driver, player)) {
             mod.ForcePlayerExitVehicle(player, vehicle)
-            await mod.Wait(0.1)
+            await mod.Wait(0)
+            await mod.Wait(0)
             mod.ForcePlayerToSeat(player, vehicle, 0)
-            // mod.AIDefendPositionBehavior(player, this.targetPos, 0, 20)
-            mod.AIValidatedMoveToBehavior(player, this.targetPos)
+            mod.AIDefendPositionBehavior(player, this.targetPos, 0, 10)
+            // mod.AIValidatedMoveToBehavior(player, this.targetPos)
 
             return
         }
@@ -2997,7 +3005,7 @@ export class CoreAI_ClosestEnemySensor extends CoreAI_ASensor {
  *
  * This sensor is for high-level AI logic only.
  */
-export class ArrivalSensor extends CoreAI_ASensor {
+export class CoreAI_ArrivalSensor extends CoreAI_ASensor {
     private lastTriggerTime = 0
 
     constructor(
@@ -3065,7 +3073,7 @@ export class ArrivalSensor extends CoreAI_ASensor {
  * - Velocity is preferred when speed > threshold.
  * - Intent direction stabilizes steering across replans.
  */
-export class MoveToSensor extends CoreAI_ASensor {
+export class CoreAI_MoveToSensor extends CoreAI_ASensor {
     private readonly ttlMs: number
 
     private coldStart: boolean = true
@@ -3248,7 +3256,7 @@ export class MoveToSensor extends CoreAI_ASensor {
  * - Selection is distance-based only; higher-level pressure or
  *   role-based logic can be layered later.
  */
-export class MoveToCapturePointSensor extends CoreAI_ASensor {
+export class CoreAI_MoveToCapturePointSensor extends CoreAI_ASensor {
     private readonly ttlMs: number
 
     constructor(
@@ -3325,6 +3333,181 @@ export class MoveToCapturePointSensor extends CoreAI_ASensor {
     }
 }
 
+// -------- FILE: src\Core\AI\Modules\Perception\Sensors\VehicleMoveToSensor.ts --------
+/**
+ * MoveToSensor:
+ * Picks a movement target from a list of points.
+ *
+ * Design:
+ * - Direction-driven, no historical recents.
+ * - While moving, backward targets are forbidden.
+ * - Velocity is preferred when speed > threshold.
+ * - Intent direction stabilizes steering across replans.
+ */
+export class CoreAI_VehicleMoveToSensor extends CoreAI_ASensor {
+    private readonly ttlMs: number
+
+    private coldStart: boolean = true
+
+    // Cached movement intent direction
+    private lastIntentDir: mod.Vector | null = null
+
+    constructor(
+        private readonly getPoints: () => mod.Vector[],
+        intervalMs: number = 750,
+        ttlMs: number = 6000
+    ) {
+        super(intervalMs)
+        this.ttlMs = ttlMs
+    }
+
+    override reset(): void {
+        this.coldStart = true
+        this.lastIntentDir = null
+    }
+
+    protected update(ctx: CoreAI_SensorContext): void {
+        const player = ctx.player
+        if (!mod.IsPlayerValid(player)) return
+
+        // Do not reselect while intent exists
+        if (ctx.memory.get('moveToPos')) return
+
+        const points = this.getPoints()
+        if (!points || points.length === 0) return
+
+        const myPos = mod.GetObjectPosition(player)
+
+        const vehicle = mod.GetVehicleFromPlayer(player)
+        if (!vehicle) return
+        const driver = mod.GetPlayerFromVehicleSeat(vehicle, 0)
+        if (!mod.IsPlayerValid(driver) || !mod.Equals(driver, player)) return
+
+        // ------------------------------------------------------------
+        // Resolve forward direction (vehicle)
+        // ------------------------------------------------------------
+
+        const vel = mod.GetVehicleState(
+            vehicle,
+            mod.VehicleStateVector.LinearVelocity
+        )
+        const speedSq = mod.DotProduct(vel, vel)
+        const speed = Math.sqrt(speedSq)
+
+        let forward: mod.Vector | null = null
+
+        // 1. True movement direction
+        if (speed > 0.3) {
+            if (speedSq > 0.1) {
+                forward = mod.Normalize(vel)
+                this.lastIntentDir = forward
+            }
+        }
+
+        // 2. Cached intent
+        if (!forward && this.lastIntentDir) {
+            forward = this.lastIntentDir
+        }
+
+        // 3. Facing fallback
+        if (!forward) {
+            const face = mod.GetVehicleState(
+                vehicle,
+                mod.VehicleStateVector.FacingDirection
+            )
+            forward = mod.Normalize(face)
+            this.lastIntentDir = forward
+        }
+
+        // ------------------------------------------------------------
+        // Build candidates
+        // ------------------------------------------------------------
+
+        const candidates: {
+            pos: mod.Vector
+            dist: number
+            dot: number
+        }[] = []
+
+        const ARRIVAL_EXCLUDE_DIST = 10.0
+
+        for (const pos of points) {
+            const dist = mod.DistanceBetween(myPos, pos)
+
+            // Already here, do not reselect
+            if (dist < ARRIVAL_EXCLUDE_DIST) {
+                continue
+            }
+
+            const dir = mod.DirectionTowards(myPos, pos)
+            const dot = mod.DotProduct(forward, dir)
+
+            candidates.push({ pos, dist, dot })
+        }
+
+        if (candidates.length === 0) return
+
+        // ------------------------------------------------------------
+        // While moving, forbid backward choices
+        // ------------------------------------------------------------
+
+        let usable = candidates
+
+        if (speed > 0.5) {
+            usable = candidates.filter((c) => c.dot > 0)
+        }
+
+        if (usable.length === 0) return
+
+        // ------------------------------------------------------------
+        // Pick best candidate
+        // ------------------------------------------------------------
+
+        let best = usable[0]
+        let bestScore = -Infinity
+
+        for (const c of usable) {
+            const score = this.scoreCandidate(c)
+            if (score > bestScore) {
+                bestScore = score
+                best = c
+            }
+        }
+
+        // ------------------------------------------------------------
+        // Commit
+        // ------------------------------------------------------------
+
+        ctx.memory.set('moveToPos', best.pos, this.ttlMs)
+        this.lastIntentDir = mod.DirectionTowards(myPos, best.pos)
+        this.coldStart = false
+    }
+
+    private scoreCandidate(c: {
+        pos: mod.Vector
+        dist: number
+        dot: number
+    }): number {
+        // Distance band scoring
+        let distScore = 0
+        if (c.dist <= 15) {
+            distScore = c.dist / 15
+        } else if (c.dist <= 40) {
+            distScore = 1
+        } else {
+            const over = c.dist - 40
+            distScore = over >= 20 ? 0 : 1 - over / 20
+        }
+
+        const dirScore = Math.max(0, c.dot)
+
+        const jitterMax = this.coldStart ? 0.8 : 0.4
+        const jitter = Math.random() * jitterMax
+
+        return distScore * 0.7 + dirScore * 0.3 + jitter
+    }
+}
+
 // -------- FILE: src\Core\AI\Profiles\CombatantProfile.ts --------
 export interface CoreAI_CombatantProfileOptions {
     fightSensor?: {
@@ -3345,6 +3528,11 @@ export interface CoreAI_CombatantProfileOptions {
     }
     moveToSensor?: {
         getRoamWPs?: () => mod.Vector[]
+        intervalMs?: number
+        ttlMs?: number
+    }
+    vehicleMoveToSensor?: {
+        getVehicleWPs?: () => mod.Vector[]
         intervalMs?: number
         ttlMs?: number
     }
@@ -3419,7 +3607,7 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
         if (options.arrivalSensor?.getDefendWPs) {
             this.sensors.push(
                 () =>
-                    new ArrivalSensor(
+                    new CoreAI_ArrivalSensor(
                         () => options.arrivalSensor!.getDefendWPs!(),
                         options.arrivalSensor?.intervalMs,
                         options.arrivalSensor?.distanceThreshold,
@@ -3432,7 +3620,7 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
         if (options.moveToCapturePointSensor?.getCapturePoints) {
             this.sensors.push(
                 () =>
-                    new MoveToCapturePointSensor(
+                    new CoreAI_MoveToCapturePointSensor(
                         () =>
                             options.moveToCapturePointSensor!
                                 .getCapturePoints!(),
@@ -3445,10 +3633,21 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
         if (options.moveToSensor?.getRoamWPs) {
             this.sensors.push(
                 () =>
-                    new MoveToSensor(
+                    new CoreAI_MoveToSensor(
                         () => options.moveToSensor!.getRoamWPs!(),
                         options.moveToSensor?.intervalMs,
                         options.moveToSensor?.ttlMs
+                    )
+            )
+        }
+
+        if (options.vehicleMoveToSensor?.getVehicleWPs) {
+            this.sensors.push(
+                () =>
+                    new CoreAI_VehicleMoveToSensor(
+                        () => options.vehicleMoveToSensor!.getVehicleWPs!(),
+                        options.vehicleMoveToSensor?.intervalMs,
+                        options.vehicleMoveToSensor?.ttlMs
                     )
             )
         }
@@ -3676,7 +3875,7 @@ export class CoreAI_FollowerProfile extends CoreAI_AProfile {
 
             // Arrival sensor only
             () =>
-                new ArrivalSensor(
+                new CoreAI_ArrivalSensor(
                     () => {
                         const p = getPoint()
                         return p ? [p] : []
@@ -4026,7 +4225,7 @@ export class PG_GameMode extends Core_AGameMode {
     }
 
     private AI_UNSPAWN_DELAY = 10
-    private AI_COUNT_TEAM_1 = 0
+    private AI_COUNT_TEAM_1 = 1
     private AI_COUNT_TEAM_2 = 1
 
     private squadManager: Core_SquadManager | null = null
@@ -4034,12 +4233,13 @@ export class PG_GameMode extends Core_AGameMode {
     protected override OnGameModeStarted(): void {
         // One-time game setup (rules, scoreboard, AI bootstrap)
         mod.SetAIToHumanDamageModifier(2)
+        mod.SetFriendlyFire(true)
 
         // Spawn initial logical bots
         for (let i = 1; i <= this.AI_COUNT_TEAM_1; i++) {
-            mod.Wait(0.5).then(() =>
+            mod.Wait(1).then(() =>
                 this.playerManager.spawnLogicalBot(
-                    mod.SoldierClass.Assault,
+                    mod.SoldierClass.Engineer,
                     1,
                     mod.GetObjectPosition(mod.GetHQ(1)),
                     mod.Message(`core.ai.bots.${i}`),
@@ -4049,10 +4249,10 @@ export class PG_GameMode extends Core_AGameMode {
         }
 
         for (let j = 1; j <= this.AI_COUNT_TEAM_2; j++) {
-            mod.Wait(0.5).then(() =>
+            mod.Wait(1).then(() =>
                 this.playerManager.spawnLogicalBot(
-                    mod.SoldierClass.Assault,
-                    1,
+                    mod.SoldierClass.Engineer,
+                    2,
                     mod.GetObjectPosition(mod.GetHQ(2)),
                     mod.Message(`core.ai.bots.${this.AI_COUNT_TEAM_1 + j}`),
                     this.AI_UNSPAWN_DELAY
@@ -4068,6 +4268,9 @@ export class PG_GameMode extends Core_AGameMode {
             mod.GetObjectPosition(mod.GetHQ(1)),
             mod.CreateVector(0, 0, 0)
         )
+
+        mod.SetVehicleSpawnerVehicleType(vehicleSpawner, mod.VehicleList.Abrams)
+        mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
 
         // mod.Wait(7).then(() => {
         mod.SetVehicleSpawnerVehicleType(vehicleSpawner, mod.VehicleList.Abrams)
@@ -4085,9 +4288,10 @@ export class PG_GameMode extends Core_AGameMode {
         this.vehicle = eventVehicle
     }
 
-    protected override OnPlayerExitVehicle(eventPlayer: mod.Player, eventVehicle: mod.Vehicle): void {
-
-    }
+    protected override OnPlayerExitVehicle(
+        eventPlayer: mod.Player,
+        eventVehicle: mod.Vehicle
+    ): void {}
 
     /*
      *
@@ -4096,28 +4300,25 @@ export class PG_GameMode extends Core_AGameMode {
     protected override async OnLogicalPlayerJoinGame(
         lp: CorePlayer_APlayer
     ): Promise<void> {
-        await mod.Wait(5)
-        mod.ForcePlayerToSeat(lp.player, this.vehicle!, 0)
-
-        await mod.Wait(3)
-
         // if (2 > 1) return
 
         // Attach AI brain to logical AI players only
         if (lp.isLogicalAI()) {
+            if (lp.teamId === 1) {
+                await mod.Wait(5)
+                mod.ForcePlayerToSeat(lp.player, this.vehicle!, -1)
+            }
+
             const brain = new CoreAI_Brain(
                 lp.player,
                 new CoreAI_CombatantProfile({
-                    moveToSensor: {
-                        getRoamWPs: () => [
-                            /* mod.GetObjectPosition(mod.GetHQ(1)),
-                            mod.GetObjectPosition(mod.GetHQ(2)), */
-                            mod.CreateVector(-472.182, 179.832, -676.411),
-                            mod.CreateVector(-351.424, 192.489, -731.139),
-                            mod.CreateVector(-403.488, 187.611, -526.54),
-                            mod.CreateVector(-303.344, 181.145, -519.643),
+                    vehicleMoveToSensor: {
+                        getVehicleWPs: () => /* this.getRoamWps(1100, 1105) */ [
+                            mod.GetObjectPosition(mod.GetHQ(1)),
+                            mod.GetObjectPosition(mod.GetHQ(3)),
+                            mod.GetObjectPosition(mod.GetHQ(4)),
                         ],
-                        ttlMs: 10000,
+                        ttlMs: 20000,
                     },
                     arrivalSensor: {
                         getDefendWPs: () => [],

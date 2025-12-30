@@ -7,7 +7,7 @@ import { CoreAI_IdleBehavior } from '../Modules/Behavior/Behaviors/IdleBehavior'
 import { CoreAI_FollowBehavior } from '../Modules/Behavior/Behaviors/FollowBehavior'
 
 import { CoreAI_FightSensor } from '../Modules/Perception/Sensors/FightSensor'
-import { ArrivalSensor } from '../Modules/Perception/Sensors/ArrivalSensor'
+import { CoreAI_ArrivalSensor } from '../Modules/Perception/Sensors/ArrivalSensor'
 import { CoreAI_ClosestEnemyBehavior } from '../Modules/Behavior/Behaviors/ClosestEnemyBehavior'
 import { CoreAI_ClosestEnemySensor } from '../Modules/Perception/Sensors/ClosestEnemySensor'
 
@@ -127,7 +127,7 @@ export class CoreAI_FollowerProfile extends CoreAI_AProfile {
 
             // Arrival sensor only
             () =>
-                new ArrivalSensor(
+                new CoreAI_ArrivalSensor(
                     () => {
                         const p = getPoint()
                         return p ? [p] : []
