@@ -1,3 +1,4 @@
+import { CoreUI_Colors } from 'src/Core/UI/UIColors'
 import { CoreAI_Brain } from '../../Brain'
 
 export interface CoreAI_IDebugWI {
@@ -6,19 +7,41 @@ export interface CoreAI_IDebugWI {
 }
 
 export class CoreAI_DebugWI {
-    private behaviorWI: CoreAI_IDebugWI
-    private distanceWI: CoreAI_IDebugWI
-    private battleWI: CoreAI_IDebugWI
-    private moveWI: CoreAI_IDebugWI
+    private behavior: CoreAI_IDebugWI
+    private stats: CoreAI_IDebugWI
+    private battle: CoreAI_IDebugWI
+    private calm: CoreAI_IDebugWI
 
-    constructor(private receiver: mod.Player, private brain: CoreAI_Brain) {
-        this.behaviorWI = { index: 0, worldIcon: this.spawnWI(receiver) }
-        this.distanceWI = { index: 1, worldIcon: this.spawnWI(receiver) }
-        this.battleWI = { index: 2, worldIcon: this.spawnWI(receiver) }
-        this.moveWI = { index: 3, worldIcon: this.spawnWI(receiver) }
+    private moveTo: mod.WorldIcon
+
+    constructor(private player: mod.Player, private brain: CoreAI_Brain) {
+        this.calm = { index: 3, worldIcon: this.spawnWI(player) }
+        this.battle = { index: 2, worldIcon: this.spawnWI(player) }
+        this.stats = { index: 1, worldIcon: this.spawnWI(player) }
+        this.behavior = { index: 0, worldIcon: this.spawnWI(player) }
+
+        this.moveTo = mod.SpawnObject(
+            mod.RuntimeSpawn_Common.WorldIcon,
+            mod.GetObjectPosition(mod.GetHQ(2)),
+            mod.CreateVector(0, 0, 0)
+        )
+        mod.SetWorldIconOwner(this.moveTo, player)
+        mod.SetWorldIconImage(this.moveTo, mod.WorldIconImages.Skull)
+        mod.EnableWorldIconImage(this.moveTo, true)
+        mod.SetWorldIconColor(this.moveTo, CoreUI_Colors.YellowDark)
     }
 
     update() {
+        if (this.brain.memory.get('moveToPos')) {
+            mod.SetWorldIconPosition(
+                this.moveTo,
+                this.brain.memory.get('moveToPos')!
+            )
+            mod.EnableWorldIconImage(this.moveTo, true)
+        } else {
+            mod.EnableWorldIconImage(this.moveTo, false)
+        }
+
         if (
             !mod.IsPlayerValid(this.brain.player) ||
             !mod.GetSoldierState(
@@ -26,81 +49,82 @@ export class CoreAI_DebugWI {
                 mod.SoldierStateBool.IsAlive
             )
         ) {
-            mod.EnableWorldIconText(this.behaviorWI.worldIcon, false)
-            mod.EnableWorldIconText(this.distanceWI.worldIcon, false)
-            mod.EnableWorldIconText(this.battleWI.worldIcon, false)
-            mod.EnableWorldIconText(this.moveWI.worldIcon, false)
+            mod.EnableWorldIconText(this.behavior.worldIcon, false)
+            mod.EnableWorldIconText(this.stats.worldIcon, false)
+            mod.EnableWorldIconText(this.battle.worldIcon, false)
+            mod.EnableWorldIconText(this.calm.worldIcon, false)
             return
         }
 
-        mod.EnableWorldIconText(this.behaviorWI.worldIcon, true)
-        mod.EnableWorldIconText(this.distanceWI.worldIcon, true)
-        mod.EnableWorldIconText(this.battleWI.worldIcon, true)
-        mod.EnableWorldIconText(this.moveWI.worldIcon, true)
+        mod.EnableWorldIconText(this.behavior.worldIcon, true)
+        mod.EnableWorldIconText(this.stats.worldIcon, true)
+        mod.EnableWorldIconText(this.battle.worldIcon, true)
+        mod.EnableWorldIconText(this.calm.worldIcon, true)
 
-        // @stringkeys core.ai.debug.brain.behaviors: fight, closestenemy, defend, idle, moveto, follow
+        // @stringkeys core.ai.debug.brain.behaviors: fight, defend, idle, moveto
 
+        /**
+         * Behavior
+         */
         this.updateWI(
-            this.behaviorWI,
+            this.behavior,
             mod.Message(
                 `core.ai.debug.brain.behaviors.${
                     this.brain.behaviorController.currentBehavior().name
                 }`
             )
         )
+
+        // Behavior Colors
         switch (this.brain.behaviorController.currentBehavior().name) {
             case 'fight':
                 mod.SetWorldIconColor(
-                    this.behaviorWI.worldIcon,
+                    this.behavior.worldIcon,
                     mod.CreateVector(1, 0, 0)
-                )
-                break
-            case 'closestenemy':
-                mod.SetWorldIconColor(
-                    this.behaviorWI.worldIcon,
-                    mod.CreateVector(1, 0, 1)
                 )
                 break
             case 'defend':
                 mod.SetWorldIconColor(
-                    this.behaviorWI.worldIcon,
+                    this.behavior.worldIcon,
                     mod.CreateVector(0, 1, 1)
                 )
                 break
             case 'moveto':
                 mod.SetWorldIconColor(
-                    this.behaviorWI.worldIcon,
+                    this.behavior.worldIcon,
                     mod.CreateVector(0, 1, 0)
-                )
-                break
-            case 'follow':
-                mod.SetWorldIconColor(
-                    this.behaviorWI.worldIcon,
-                    mod.CreateVector(1, 1, 0)
                 )
                 break
             case 'idle':
                 mod.SetWorldIconColor(
-                    this.behaviorWI.worldIcon,
+                    this.behavior.worldIcon,
                     mod.CreateVector(1, 1, 1)
                 )
                 break
         }
+
+        /**
+         * Stats (distance + team)
+         */
         this.updateWI(
-            this.distanceWI,
+            this.stats,
             mod.Message(
                 `core.ai.debug.brain.distance`,
                 Math.floor(
                     mod.DistanceBetween(
                         mod.GetObjectPosition(this.brain.player),
-                        mod.GetObjectPosition(this.receiver)
+                        mod.GetObjectPosition(this.player)
                     )
                 ),
                 mod.GetObjId(mod.GetTeam(this.brain.player))
             )
         )
+
+        /**
+         * Battle Memory fields
+         */
         this.updateWI(
-            this.battleWI,
+            this.battle,
             mod.Message(
                 `core.ai.debug.brain.memory.battle`,
                 this.brain.memory.getTimeRemaining('isFiring'),
@@ -108,8 +132,12 @@ export class CoreAI_DebugWI {
                 this.brain.memory.getTimeRemaining('closestEnemy')
             )
         )
+
+        /**
+         * Calm Memory fields
+         */
         this.updateWI(
-            this.moveWI,
+            this.calm,
             mod.Message(
                 `core.ai.debug.brain.memory.calm`,
                 this.brain.memory.getTimeRemaining('moveToPos'),
@@ -196,7 +224,7 @@ export class CoreAI_DebugWI {
                     this.getStackedIconOffset(
                         mod.DistanceBetween(
                             mod.GetObjectPosition(this.brain.player),
-                            mod.GetObjectPosition(this.receiver)
+                            mod.GetObjectPosition(this.player)
                         ),
                         wi.index,
                         0.6

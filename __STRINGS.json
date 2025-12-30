@@ -11,10 +11,10 @@
             "moveto": "moveto",
             "follow": "follow"
           },
-          "distance": "d: {} | t: {}",
+          "distance": "dis: {} | tea: {}",
           "memory": {
-            "battle": "f: {} | d: {} | c: {}",
-            "calm": "m: {} | a: {}"
+            "battle": "fig: {} | def: {} | ene: {}",
+            "calm": "mov: {} | arr: {}"
           }
         }
       },

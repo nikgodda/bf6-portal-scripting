@@ -57,23 +57,31 @@ export class PG_GameMode extends Core_AGameMode {
             mod.CreateVector(0, 0, 0)
         )
 
-        mod.SetVehicleSpawnerVehicleType(vehicleSpawner, mod.VehicleList.Abrams)
-        mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
-
-        // mod.Wait(7).then(() => {
-        mod.SetVehicleSpawnerVehicleType(vehicleSpawner, mod.VehicleList.Abrams)
-        mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
-        // })
+        mod.Wait(5).then(() => {
+            mod.SetVehicleSpawnerVehicleType(
+                vehicleSpawner,
+                mod.VehicleList.Abrams
+            )
+            mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
+        })
     }
 
     /*
      *
      */
 
-    private vehicle: mod.Vehicle | null = null
-
     protected override OnVehicleSpawned(eventVehicle: mod.Vehicle): void {
-        this.vehicle = eventVehicle
+        if (!mod.CompareVehicleName(eventVehicle, mod.VehicleList.Abrams)) {
+            return
+        }
+
+        mod.Wait(5).then(() => {
+            mod.ForcePlayerToSeat(
+                this.playerManager.getById(1)!.player,
+                eventVehicle,
+                -1
+            )
+        })
     }
 
     protected override OnPlayerExitVehicle(
@@ -110,11 +118,12 @@ export class PG_GameMode extends Core_AGameMode {
                         ttlMs: 10000,
                     },
                     driverMoveToSensor: {
-                        getWPs: () => [
+                        getWPs: () => this.getOnfootWPs(1100, 1105),
+                        /* [
                             mod.GetObjectPosition(mod.GetHQ(1)),
                             mod.GetObjectPosition(mod.GetHQ(3)),
                             mod.GetObjectPosition(mod.GetHQ(4)),
-                        ],
+                        ], */
                         ttlMs: 20000,
                     },
                     arrivalSensor: {
@@ -133,7 +142,7 @@ export class PG_GameMode extends Core_AGameMode {
             this.squadManager = new Core_SquadManager(this, 2)
         }
 
-        this.squadManager.addToSquad(lp)
+        // this.squadManager.addToSquad(lp)
     }
 
     protected override OnPlayerLeaveGame(eventNumber: number): void {
