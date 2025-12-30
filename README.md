@@ -1,4 +1,4 @@
-# BF6 Portal Scripting
+# BF6 Portal Scripting Gameplay Framework
 
 This is the gameplay framework for Battlefield Portal scripting.
 
