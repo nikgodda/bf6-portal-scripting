@@ -1723,227 +1723,6 @@ export abstract class Core_AGameMode<
     }
 }
 
-// -------- FILE: src\Core\Player\Components\BattleStats\BattleStatsComponent.ts --------
-export class CorePlayer_BattleStatsComponent implements CorePlayer_IComponent {
-    private kills = 0
-    private deaths = 0
-    private teamKills = 0
-    private score = 0
-    private killStreak = 0
-
-    onAttach(ap: CorePlayer_APlayer): void {
-        // No-op
-    }
-
-    onDetach(ap: CorePlayer_APlayer): void {
-        // No-op
-    }
-
-    /* ------------------------------------------------------------
-     * Kills
-     * ------------------------------------------------------------ */
-
-    getKills(): number {
-        return this.kills
-    }
-
-    addKill(amount = 1): void {
-        this.kills += amount
-    }
-
-    /* ------------------------------------------------------------
-     * Deaths
-     * ------------------------------------------------------------ */
-
-    getDeaths(): number {
-        return this.deaths
-    }
-
-    addDeath(amount = 1): void {
-        this.deaths += amount
-    }
-
-    /* ------------------------------------------------------------
-     * Team kills
-     * ------------------------------------------------------------ */
-
-    getTeamKills(): number {
-        return this.teamKills
-    }
-
-    addTeamKill(amount = 1): void {
-        this.teamKills += amount
-    }
-
-    /* ------------------------------------------------------------
-     * Score
-     * ------------------------------------------------------------ */
-
-    getScore(): number {
-        return this.score
-    }
-
-    setScore(value: number): void {
-        this.score = value
-    }
-
-    addScore(delta: number): void {
-        this.score += delta
-    }
-
-    /* ------------------------------------------------------------
-     * Killstreak
-     * ------------------------------------------------------------ */
-
-    getKillStreak(): number {
-        return this.killStreak
-    }
-
-    addKillStreak(amount = 1): void {
-        this.killStreak += amount
-    }
-
-    clearKillStreak(): void {
-        this.killStreak = 0
-    }
-}
-
-// -------- FILE: src\Core\Player\Components\Protection\ProtectionComponent.ts --------
-export class CorePlayer_ProtectionComponent implements CorePlayer_IComponent {
-    private ap!: CorePlayer_APlayer
-    private active: boolean = false
-    private deactivateAt: number = 0
-
-    onAttach(ap: CorePlayer_APlayer): void {
-        this.ap = ap
-
-        ap.addListener({
-            OngoingPlayer: () => {
-                if (!this.active) return
-
-                if (this.deactivateAt > 0 && Date.now() >= this.deactivateAt) {
-                    this.deactivate()
-                }
-            },
-        })
-    }
-
-    onDetach(ap: CorePlayer_APlayer): void {
-        this.active = false
-        this.deactivateAt = 0
-    }
-
-    activate(durationSec?: number): void {
-        this.active = true
-
-        mod.SetPlayerIncomingDamageFactor(this.ap.player, 0)
-
-        if (durationSec && durationSec > 0) {
-            this.deactivateAt = Date.now() + durationSec * 1000
-        } else {
-            this.deactivateAt = 0
-        }
-    }
-
-    deactivate(): void {
-        this.active = false
-        this.deactivateAt = 0
-
-        // BUG: setting 1 does NOT work
-        mod.SetPlayerIncomingDamageFactor(this.ap.player, 0.999)
-    }
-
-    isActive(): boolean {
-        return this.active
-    }
-}
-
-// -------- FILE: src\GameModes\TDM\Player\TDM_Player.ts --------
-export class TDM_Player extends CorePlayer_APlayer {
-    protectionComp: CorePlayer_ProtectionComponent
-    battleStatsComp: CorePlayer_BattleStatsComponent
-
-    constructor(player: mod.Player) {
-        super(player)
-
-        this.protectionComp = new CorePlayer_ProtectionComponent()
-        this.addComponent(this.protectionComp)
-
-        this.battleStatsComp = new CorePlayer_BattleStatsComponent()
-        this.addComponent(this.battleStatsComp)
-
-        // Per-player stat tracking + per-tick scoreboard sync.
-        // Team score is handled in TDM_GameMode.
-        this.addListener({
-            OnPlayerDeployed: () => {
-                // Spawn protection + reset streak on deploy.
-                this.protectionComp.activate(5)
-                this.battleStatsComp.clearKillStreak()
-            },
-
-            OnPlayerDied: () => {
-                // Track death and force cleanup for the soldier entity.
-                this.battleStatsComp.addDeath()
-
-                mod.Wait(0.1).then(() => {
-                    mod.Kill(this.player)
-                })
-            },
-
-            OnPlayerEarnedKill: (
-                eventOtherPlayer,
-                eventDeathType,
-                eventWeaponUnlock
-            ) => {
-                if (!eventOtherPlayer) {
-                    return
-                }
-
-                if (
-                    mod.Equals(
-                        mod.GetTeam(this.player),
-                        mod.GetTeam(eventOtherPlayer.player)
-                    )
-                ) {
-                    // Friendly fire counts as team kill (ignore self).
-                    if (!mod.Equals(this.player, eventOtherPlayer.player)) {
-                        this.battleStatsComp.addTeamKill()
-                    }
-                } else {
-                    // Enemy kill: update personal stats only.
-                    this.battleStatsComp.addKill()
-                    this.battleStatsComp.addKillStreak()
-                    this.battleStatsComp.addScore(
-                        100 + (this.battleStatsComp.getKillStreak() - 1) * 10
-                    )
-                }
-            },
-
-            OngoingPlayer: () => {
-                if (!mod.IsPlayerValid(this.player)) {
-                    return
-                }
-
-                mod.SetScoreboardPlayerValues(
-                    this.player,
-                    this.battleStatsComp.getScore(),
-                    this.battleStatsComp.getKills(),
-                    this.battleStatsComp.getDeaths(),
-                    this.battleStatsComp.getTeamKills(),
-                    this.battleStatsComp.getKillStreak()
-                )
-            },
-        })
-    }
-}
-
-// -------- FILE: src\GameModes\TDM\Player\TDM_PlayerManager.ts --------
-export class TDM_PlayerManager extends CorePlayer_APlayerManager {
-    constructor() {
-        super(TDM_Player)
-    }
-}
-
 // -------- FILE: src\Core\AI\Modules\Memory\MemoryManager.ts --------
 /**
  * CoreAI_MemoryManager:
@@ -2841,8 +2620,10 @@ export class CoreAI_Brain {
      * ------------------------------------------------------------ */
 
     onMoveFinished(success: boolean): void {
+        /* mod.DisplayHighlightedWorldLogMessage(mod.Message(454))
+
         this.memory.set('moveToPos', null)
-        this.emit('OnMoveFinished', success)
+        this.emit('OnMoveFinished', success) */
     }
 
     /* ------------------------------------------------------------
@@ -3108,9 +2889,23 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
         this.speed = speed
     }
 
-    override enter(): void {
+    override async enter(): Promise<void> {
+        mod.DisplayHighlightedWorldLogMessage(mod.Message(202))
+
         const player = this.brain.player
         if (!mod.IsPlayerValid(player)) return
+
+        const vehicle = mod.GetVehicleFromPlayer(player)
+        const driver = mod.GetPlayerFromVehicleSeat(vehicle, 0)
+        if (mod.IsPlayerValid(driver) && mod.Equals(driver, player)) {
+            mod.ForcePlayerExitVehicle(player, vehicle)
+            await mod.Wait(0.1)
+            mod.ForcePlayerToSeat(player, vehicle, 0)
+            // mod.AIDefendPositionBehavior(player, this.targetPos, 0, 20)
+            mod.AIValidatedMoveToBehavior(player, this.targetPos)
+
+            return
+        }
 
         mod.AISetMoveSpeed(player, this.speed)
         mod.AIValidatedMoveToBehavior(player, this.targetPos)
@@ -4063,35 +3858,182 @@ export class Core_SquadManager {
     }
 }
 
-// -------- FILE: src\GameModes\TDM\TDM_GameMode.ts --------
-export class TDM_GameMode extends Core_AGameMode {
-    protected override createPlayerManager(): CorePlayer_APlayerManager {
-        return new TDM_PlayerManager()
+// -------- FILE: src\Core\Player\Components\BattleStats\BattleStatsComponent.ts --------
+export class CorePlayer_BattleStatsComponent implements CorePlayer_IComponent {
+    private kills = 0
+    private deaths = 0
+    private teamKills = 0
+    private score = 0
+    private killStreak = 0
+
+    onAttach(ap: CorePlayer_APlayer): void {
+        // No-op
     }
 
-    private TARGET_SCORE = 30
+    onDetach(ap: CorePlayer_APlayer): void {
+        // No-op
+    }
+
+    /* ------------------------------------------------------------
+     * Kills
+     * ------------------------------------------------------------ */
+
+    getKills(): number {
+        return this.kills
+    }
+
+    addKill(amount = 1): void {
+        this.kills += amount
+    }
+
+    /* ------------------------------------------------------------
+     * Deaths
+     * ------------------------------------------------------------ */
+
+    getDeaths(): number {
+        return this.deaths
+    }
+
+    addDeath(amount = 1): void {
+        this.deaths += amount
+    }
+
+    /* ------------------------------------------------------------
+     * Team kills
+     * ------------------------------------------------------------ */
+
+    getTeamKills(): number {
+        return this.teamKills
+    }
+
+    addTeamKill(amount = 1): void {
+        this.teamKills += amount
+    }
+
+    /* ------------------------------------------------------------
+     * Score
+     * ------------------------------------------------------------ */
+
+    getScore(): number {
+        return this.score
+    }
+
+    setScore(value: number): void {
+        this.score = value
+    }
+
+    addScore(delta: number): void {
+        this.score += delta
+    }
+
+    /* ------------------------------------------------------------
+     * Killstreak
+     * ------------------------------------------------------------ */
+
+    getKillStreak(): number {
+        return this.killStreak
+    }
+
+    addKillStreak(amount = 1): void {
+        this.killStreak += amount
+    }
+
+    clearKillStreak(): void {
+        this.killStreak = 0
+    }
+}
+
+// -------- FILE: src\Core\Player\Components\Protection\ProtectionComponent.ts --------
+export class CorePlayer_ProtectionComponent implements CorePlayer_IComponent {
+    private ap!: CorePlayer_APlayer
+    private active: boolean = false
+    private deactivateAt: number = 0
+
+    onAttach(ap: CorePlayer_APlayer): void {
+        this.ap = ap
+
+        ap.addListener({
+            OngoingPlayer: () => {
+                if (!this.active) return
+
+                if (this.deactivateAt > 0 && Date.now() >= this.deactivateAt) {
+                    this.deactivate()
+                }
+            },
+        })
+    }
+
+    onDetach(ap: CorePlayer_APlayer): void {
+        this.active = false
+        this.deactivateAt = 0
+    }
+
+    activate(durationSec?: number): void {
+        this.active = true
+
+        mod.SetPlayerIncomingDamageFactor(this.ap.player, 0)
+
+        if (durationSec && durationSec > 0) {
+            this.deactivateAt = Date.now() + durationSec * 1000
+        } else {
+            this.deactivateAt = 0
+        }
+    }
+
+    deactivate(): void {
+        this.active = false
+        this.deactivateAt = 0
+
+        // BUG: setting 1 does NOT work
+        mod.SetPlayerIncomingDamageFactor(this.ap.player, 0.999)
+    }
+
+    isActive(): boolean {
+        return this.active
+    }
+}
+
+// -------- FILE: src\GameModes\Playground\Player\Player.ts --------
+export class Player extends CorePlayer_APlayer {
+    protectionComp: CorePlayer_ProtectionComponent
+
+    constructor(player: mod.Player) {
+        super(player)
+
+        this.protectionComp = new CorePlayer_ProtectionComponent()
+        this.addComponent(this.protectionComp)
+
+        this.addListener({
+            OnPlayerDeployed: () => {
+                // spawn protection
+                this.protectionComp.activate(5)
+            },
+        })
+    }
+}
+
+// -------- FILE: src\GameModes\Playground\Player\PlayerManager.ts --------
+export class PlayerManager extends CorePlayer_APlayerManager {
+    constructor() {
+        super(Player)
+    }
+}
+
+// -------- FILE: src\GameModes\Playground\PG_GameMode.ts --------
+export class PG_GameMode extends Core_AGameMode {
+    protected override createPlayerManager(): CorePlayer_APlayerManager {
+        return new PlayerManager()
+    }
+
     private AI_UNSPAWN_DELAY = 10
-    private AI_COUNT_TEAM_1 = 3
-    private AI_COUNT_TEAM_2 = 8
+    private AI_COUNT_TEAM_1 = 0
+    private AI_COUNT_TEAM_2 = 1
 
     private squadManager: Core_SquadManager | null = null
-    private teamScores = new Map<number, number>()
 
     protected override OnGameModeStarted(): void {
         // One-time game setup (rules, scoreboard, AI bootstrap)
         mod.SetAIToHumanDamageModifier(2)
-
-        mod.SetGameModeTargetScore(this.TARGET_SCORE)
-
-        mod.SetScoreboardType(mod.ScoreboardType.CustomTwoTeams)
-        mod.SetScoreboardColumnNames(
-            mod.Message(`gamemodes.PRSR.scoreboard.score`),
-            mod.Message(`gamemodes.PRSR.scoreboard.kills`),
-            mod.Message(`gamemodes.PRSR.scoreboard.deaths`),
-            mod.Message(`gamemodes.PRSR.scoreboard.teamKills`),
-            mod.Message(`gamemodes.PRSR.scoreboard.killStreak`)
-        )
-        mod.SetScoreboardColumnWidths(1, 0.5, 0.5, 0.5, 0.5)
 
         // Spawn initial logical bots
         for (let i = 1; i <= this.AI_COUNT_TEAM_1; i++) {
@@ -4110,41 +4052,90 @@ export class TDM_GameMode extends Core_AGameMode {
             mod.Wait(0.5).then(() =>
                 this.playerManager.spawnLogicalBot(
                     mod.SoldierClass.Assault,
-                    2,
+                    1,
                     mod.GetObjectPosition(mod.GetHQ(2)),
                     mod.Message(`core.ai.bots.${this.AI_COUNT_TEAM_1 + j}`),
                     this.AI_UNSPAWN_DELAY
                 )
             )
         }
+
+        /*
+         *
+         */
+        const vehicleSpawner = mod.SpawnObject(
+            mod.RuntimeSpawn_Common.VehicleSpawner,
+            mod.GetObjectPosition(mod.GetHQ(1)),
+            mod.CreateVector(0, 0, 0)
+        )
+
+        // mod.Wait(7).then(() => {
+        mod.SetVehicleSpawnerVehicleType(vehicleSpawner, mod.VehicleList.Abrams)
+        mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
+        // })
     }
 
-    protected override OnLogicalPlayerJoinGame(lp: CorePlayer_APlayer): void {
+    /*
+     *
+     */
+
+    private vehicle: mod.Vehicle | null = null
+
+    protected override OnVehicleSpawned(eventVehicle: mod.Vehicle): void {
+        this.vehicle = eventVehicle
+    }
+
+    protected override OnPlayerExitVehicle(eventPlayer: mod.Player, eventVehicle: mod.Vehicle): void {
+
+    }
+
+    /*
+     *
+     */
+
+    protected override async OnLogicalPlayerJoinGame(
+        lp: CorePlayer_APlayer
+    ): Promise<void> {
+        await mod.Wait(5)
+        mod.ForcePlayerToSeat(lp.player, this.vehicle!, 0)
+
+        await mod.Wait(3)
+
+        // if (2 > 1) return
+
         // Attach AI brain to logical AI players only
         if (lp.isLogicalAI()) {
             const brain = new CoreAI_Brain(
                 lp.player,
                 new CoreAI_CombatantProfile({
                     moveToSensor: {
-                        getRoamWPs: () => this.getRoamWps(1000, 1010),
+                        getRoamWPs: () => [
+                            /* mod.GetObjectPosition(mod.GetHQ(1)),
+                            mod.GetObjectPosition(mod.GetHQ(2)), */
+                            mod.CreateVector(-472.182, 179.832, -676.411),
+                            mod.CreateVector(-351.424, 192.489, -731.139),
+                            mod.CreateVector(-403.488, 187.611, -526.54),
+                            mod.CreateVector(-303.344, 181.145, -519.643),
+                        ],
+                        ttlMs: 10000,
                     },
                     arrivalSensor: {
-                        getDefendWPs: () => this.getRoamWps(1000, 1010),
+                        getDefendWPs: () => [],
                         ttlMs: 4000,
                     },
                 }),
-                false
+                true
             )
 
             lp.addComponent(new BrainComponent(brain))
         }
 
         // Ensure squad system exists and register the player
-        if (!this.squadManager) {
+        /* if (!this.squadManager) {
             this.squadManager = new Core_SquadManager(this, 2)
         }
 
-        this.squadManager.addToSquad(lp)
+        this.squadManager.addToSquad(lp) */
     }
 
     protected override OnPlayerLeaveGame(eventNumber: number): void {
@@ -4159,50 +4150,6 @@ export class TDM_GameMode extends Core_AGameMode {
                 this.AI_UNSPAWN_DELAY
             )
         }
-    }
-
-    protected override OnPlayerEarnedKill(
-        eventPlayer: mod.Player,
-        eventOtherPlayer: mod.Player,
-        eventDeathType: mod.DeathType,
-        eventWeaponUnlock: mod.WeaponUnlock
-    ): void {
-        const team = mod.GetTeam(eventPlayer)
-        const otherTeam = mod.GetTeam(eventOtherPlayer)
-
-        if (mod.Equals(team, otherTeam)) {
-            return
-        }
-
-        // Team score increments only on enemy kills
-        const teamScore = this.addTeamScore(team, 1)
-
-        mod.SetGameModeScore(team, teamScore)
-    }
-
-    protected override OngoingGlobal(): void {
-        mod.SetScoreboardHeader(
-            mod.Message(
-                `gamemodes.TDM.scoreboard.team1`,
-                mod.GetGameModeScore(mod.GetTeam(1)),
-                this.TARGET_SCORE
-            ),
-            mod.Message(
-                `gamemodes.TDM.scoreboard.team2`,
-                mod.GetGameModeScore(mod.GetTeam(2)),
-                this.TARGET_SCORE
-            )
-        )
-    }
-
-    private addTeamScore(team: mod.Team, deltaScore: number): number {
-        // Local cache avoids race conditions on rapid multi-kill events
-        const teamId = mod.GetObjId(team)
-        const currentScore =
-            this.teamScores.get(teamId) ?? mod.GetGameModeScore(team)
-        const nextScore = currentScore + deltaScore
-        this.teamScores.set(teamId, nextScore)
-        return nextScore
     }
 
     private getRoamWps(from: number, to: number): mod.Vector[] {
@@ -4288,7 +4235,9 @@ export class TDM_GameMode extends Core_AGameMode {
  */
 // import { PRSR_GameMode } from './GameModes/Pressure/PRSR_GameMode'
 // import { TPL_GameMode } from './GameModes/Template/TPL_GameMode'
-const gameMode: Core_AGameMode = new TDM_GameMode()
+// import { TDM_GameMode } from './GameModes/TDM/TDM_GameMode'
+
+const gameMode: Core_AGameMode = new PG_GameMode()
 
 // This will trigger every engine tick while the gamemode is running.
 export function OngoingGlobal(): void {

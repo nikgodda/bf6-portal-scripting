@@ -106,7 +106,7 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
             this.sensors.push(
                 () =>
                     new ArrivalSensor(
-                        () => options.arrivalSensor!.getDefendWPs!(), 
+                        () => options.arrivalSensor!.getDefendWPs!(),
                         options.arrivalSensor?.intervalMs,
                         options.arrivalSensor?.distanceThreshold,
                         options.arrivalSensor?.ttlMs,
