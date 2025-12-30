@@ -8,7 +8,6 @@
 
 export type CoreAI_MemoryFields = {
     closestEnemy: mod.Player | null
-    closestEnemyPos: mod.Vector | null
 
     damagedBy: mod.Player | null
     isFiring: boolean
@@ -24,7 +23,6 @@ export class CoreAI_MemoryManager {
     /** All memory values live here */
     public data: CoreAI_MemoryFields = {
         closestEnemy: null,
-        closestEnemyPos: null,
 
         damagedBy: null,
         isFiring: false,
@@ -121,7 +119,6 @@ export class CoreAI_MemoryManager {
 
         this.data = {
             closestEnemy: null,
-            closestEnemyPos: null,
 
             damagedBy: null,
             isFiring: false,

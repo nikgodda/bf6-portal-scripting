@@ -1,5 +1,5 @@
-import { CoreAI_ASensor } from './ASensor'
-import { CoreAI_SensorContext } from './SensorContext'
+import { CoreAI_ASensor } from '../ASensor'
+import { CoreAI_SensorContext } from '../SensorContext'
 
 /**
  * MoveToSensor:
@@ -11,7 +11,7 @@ import { CoreAI_SensorContext } from './SensorContext'
  * - Velocity is preferred when speed > threshold.
  * - Intent direction stabilizes steering across replans.
  */
-export class CoreAI_MoveToSensor extends CoreAI_ASensor {
+export class CoreAI_OnfootMoveToSensor extends CoreAI_ASensor {
     private readonly ttlMs: number
 
     private coldStart: boolean = true
@@ -36,6 +36,9 @@ export class CoreAI_MoveToSensor extends CoreAI_ASensor {
     protected update(ctx: CoreAI_SensorContext): void {
         const player = ctx.player
         if (!mod.IsPlayerValid(player)) return
+        if (mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle)) {
+            return
+        }
 
         // Do not reselect while intent exists
         if (ctx.memory.get('moveToPos')) return

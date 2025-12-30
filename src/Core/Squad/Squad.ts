@@ -1,6 +1,6 @@
 import { Core_AGameMode } from '../AGameMode'
 import { CorePlayer_APlayer } from '../Player/APlayer'
-import { CoreAI_FollowerProfile } from '../AI/Profiles/FollowerProfile'
+import { CoreAI_CombatantProfile } from '../AI/Profiles/CombatantProfile'
 import { BrainComponent } from '../AI/Components/BrainComponent'
 
 export class CoreAI_Squad {
@@ -83,9 +83,23 @@ export class CoreAI_Squad {
             return
         }
 
-        // Assign follower profile
-        const profile = new CoreAI_FollowerProfile({
-            getPoint: () => this.getSquadPoint(),
+        // Assign combatant profile configured to follow leader
+        const profile = new CoreAI_CombatantProfile({
+            onfootMoveToSensor: {
+                getWPs: () => {
+                    const p = this.getSquadPoint()
+                    return p ? [p] : []
+                },
+            },
+            arrivalSensor: {
+                getWPs: () => {
+                    const p = this.getSquadPoint()
+                    return p ? [p] : []
+                },
+                cooldownMs: 0,
+                distanceThreshold: 5,
+                ttlMs: 4000,
+            },
         })
         brainComp.brain.installProfile(profile)
     }

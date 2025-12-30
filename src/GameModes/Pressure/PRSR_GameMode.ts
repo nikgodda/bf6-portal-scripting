@@ -91,12 +91,12 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
         }
 
         // Set AI Brain
-        if (lp.isAI() && !lp.getComponent(BrainComponent)) {
+        if (lp.isLogicalAI()) {
             const brain = new CoreAI_Brain(
                 lp.player,
                 new CoreAI_CombatantProfile({
                     arrivalSensor: {
-                        getDefendWPs: () => this.getDefendWPs(),
+                        getWPs: () => this.getDefendWPs(),
                         ttlMs: 10000,
                     },
                     moveToCapturePointSensor: {

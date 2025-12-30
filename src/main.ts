@@ -68,8 +68,8 @@
  */
 
 import { Core_AGameMode } from './Core/AGameMode'
-import { PG_GameMode } from './GameModes/Playground/PG_GameMode'
 
+import { PG_GameMode } from './GameModes/Playground/PG_GameMode'
 // import { PRSR_GameMode } from './GameModes/Pressure/PRSR_GameMode'
 // import { TPL_GameMode } from './GameModes/Template/TPL_GameMode'
 // import { TDM_GameMode } from './GameModes/TDM/TDM_GameMode'

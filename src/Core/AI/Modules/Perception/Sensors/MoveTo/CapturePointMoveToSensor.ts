@@ -1,5 +1,5 @@
-import { CoreAI_ASensor } from './ASensor'
-import { CoreAI_SensorContext } from './SensorContext'
+import { CoreAI_ASensor } from '../ASensor'
+import { CoreAI_SensorContext } from '../SensorContext'
 
 /**
  * MoveToCapturePointSensor
@@ -23,7 +23,7 @@ import { CoreAI_SensorContext } from './SensorContext'
  * - Selection is distance-based only; higher-level pressure or
  *   role-based logic can be layered later.
  */
-export class CoreAI_MoveToCapturePointSensor extends CoreAI_ASensor {
+export class CoreAI_CapturePointMoveToSensor extends CoreAI_ASensor {
     private readonly ttlMs: number
 
     constructor(

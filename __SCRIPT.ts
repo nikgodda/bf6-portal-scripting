@@ -1734,7 +1734,6 @@ export abstract class Core_AGameMode<
 
 export type CoreAI_MemoryFields = {
     closestEnemy: mod.Player | null
-    closestEnemyPos: mod.Vector | null
 
     damagedBy: mod.Player | null
     isFiring: boolean
@@ -1750,7 +1749,6 @@ export class CoreAI_MemoryManager {
     /** All memory values live here */
     public data: CoreAI_MemoryFields = {
         closestEnemy: null,
-        closestEnemyPos: null,
 
         damagedBy: null,
         isFiring: false,
@@ -1847,7 +1845,6 @@ export class CoreAI_MemoryManager {
 
         this.data = {
             closestEnemy: null,
-            closestEnemyPos: null,
 
             damagedBy: null,
             isFiring: false,
@@ -2620,10 +2617,10 @@ export class CoreAI_Brain {
      * ------------------------------------------------------------ */
 
     onMoveFinished(success: boolean): void {
-        /* mod.DisplayHighlightedWorldLogMessage(mod.Message(454))
+        // mod.DisplayHighlightedWorldLogMessage(mod.Message(454))
 
         this.memory.set('moveToPos', null)
-        this.emit('OnMoveFinished', success) */
+        this.emit('OnMoveFinished', success)
     }
 
     /* ------------------------------------------------------------
@@ -2756,59 +2753,6 @@ export class CoreAI_FightBehavior extends CoreAI_ABehavior {
     }
 }
 
-// -------- FILE: src\Core\AI\Modules\Behavior\Behaviors\ClosestEnemyBehavior.ts --------
-/**
- * ClosestEnemyBehavior:
- * Moves toward an enemy detected by ClosestEnemySensor.
- *
- * - Snapshots enemy position once (no tracking)
- * - Aiming only if enemy valid at enter()
- * - Movement is engine-driven
- */
-export class CoreAI_ClosestEnemyBehavior extends CoreAI_ABehavior {
-    public name = 'closestenemy'
-
-    private readonly enemy: mod.Player
-    private readonly speed: mod.MoveSpeed
-
-    constructor(brain: CoreAI_Brain, enemy: mod.Player, speed: mod.MoveSpeed) {
-        super(brain)
-        this.enemy = enemy
-        this.speed = speed
-    }
-
-    override enter(): void {
-        const player = this.brain.player
-        if (!mod.IsPlayerValid(player)) return
-
-        // Aim at enemy if valid
-        if (mod.IsPlayerValid(this.enemy)) {
-            mod.AISetTarget(player, this.enemy)
-        } else {
-            mod.AISetTarget(player)
-        }
-
-        // Snapshot enemy position
-        const pos = mod.GetObjectPosition(this.enemy)
-        if (!pos) return
-
-        mod.AISetMoveSpeed(player, this.speed)
-        mod.AIValidatedMoveToBehavior(player, pos)
-    }
-
-    override update(): void {
-        // Movement is handled by engine; behavior has nothing to update
-    }
-
-    override exit(): void {
-        // Clear target on behavior exit
-        const player = this.brain.player
-        if (mod.IsPlayerValid(player)) {
-            mod.AISetTarget(player)
-        }
-    }
-}
-
 // -------- FILE: src\Core\AI\Modules\Behavior\Behaviors\DefendBehavior.ts --------
 /**
  * DefendBehavior:
@@ -2869,11 +2813,15 @@ export class CoreAI_DefendBehavior extends CoreAI_ABehavior {
 }
 
 // -------- FILE: src\Core\AI\Modules\Behavior\Behaviors\MoveToBehavior.ts --------
+type CoreAI_MoveToMode = 'onfoot' | 'driver'
+
 /**
  * MoveToBehavior:
  * - Starts movement in enter()
  * - Runs as long as memory.moveToPos exists
  * - Stopped automatically when TTL clears moveToPos
+ * - Optional target enables AISetTarget during movement
+ * - Mode selects on-foot or driver logic (never both)
  *
  * TTL-driven memory replaces durationMs logic.
  */
@@ -2882,39 +2830,62 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
 
     private readonly targetPos: mod.Vector
     private readonly speed: mod.MoveSpeed
+    private readonly target: mod.Player | null
+    private readonly mode: CoreAI_MoveToMode
 
-    constructor(brain: CoreAI_Brain, pos: mod.Vector, speed: mod.MoveSpeed) {
+    constructor(
+        brain: CoreAI_Brain,
+        pos: mod.Vector,
+        speed: mod.MoveSpeed,
+        target: mod.Player | null = null,
+        mode: CoreAI_MoveToMode = 'onfoot'
+    ) {
         super(brain)
         this.targetPos = pos
         this.speed = speed
+        this.target = target
+        this.mode = mode
     }
 
     override async enter(): Promise<void> {
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(202))
-        console.log(
+        /* console.log(
             mod.XComponentOf(this.targetPos),
             ' ',
             mod.YComponentOf(this.targetPos),
             ' ',
             mod.ZComponentOf(this.targetPos)
-        )
+        ) */
 
         const player = this.brain.player
         if (!mod.IsPlayerValid(player)) return
 
-        const vehicle = mod.GetVehicleFromPlayer(player)
-        const driver = mod.GetPlayerFromVehicleSeat(vehicle, 0)
-        if (mod.IsPlayerValid(driver) && mod.Equals(driver, player)) {
-            mod.ForcePlayerExitVehicle(player, vehicle)
-            await mod.Wait(0)
-            await mod.Wait(0)
-            mod.ForcePlayerToSeat(player, vehicle, 0)
-            mod.AIDefendPositionBehavior(player, this.targetPos, 0, 10)
-            // mod.AIValidatedMoveToBehavior(player, this.targetPos)
+        if (this.target && mod.IsPlayerValid(this.target)) {
+            mod.AISetTarget(player, this.target)
+        } else {
+            mod.AISetTarget(player)
+        }
 
+        if (this.mode === 'driver') {
+            await this.enterDriverMove(player)
             return
         }
 
+        this.enterOnFootMove(player)
+    }
+
+    private async enterDriverMove(player: mod.Player): Promise<void> {
+        const vehicle = mod.GetVehicleFromPlayer(player)
+        if (!vehicle) return
+
+        mod.ForcePlayerExitVehicle(player, vehicle)
+        await mod.Wait(0)
+        await mod.Wait(0)
+        mod.ForcePlayerToSeat(player, vehicle, 0)
+        mod.AIDefendPositionBehavior(player, this.targetPos, 0, 10)
+        // mod.AIValidatedMoveToBehavior(player, this.targetPos)
+    }
+
+    private enterOnFootMove(player: mod.Player): void {
         mod.AISetMoveSpeed(player, this.speed)
         mod.AIValidatedMoveToBehavior(player, this.targetPos)
     }
@@ -2925,18 +2896,20 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
     }
 
     override exit(): void {
-        // No cleanup needed
+        if (this.target && mod.IsPlayerValid(this.brain.player)) {
+            mod.AISetTarget(this.brain.player)
+        }
     }
 }
 
-// -------- FILE: src\Core\AI\Modules\Perception\Sensors\ClosestEnemySensor.ts --------
+// -------- FILE: src\Core\AI\Modules\Perception\Sensors\MoveTo\ClosestEnemySensor.ts --------
 /**
  * ClosestEnemySensor:
  * Detects the closest visible enemy and writes raw data into memory.
  *
  * Writes:
  * - memory.closestEnemy
- * - memory.closestEnemyPos
+ * - memory.moveToPos
  *
  * Notes:
  * - No POIs are created.
@@ -2968,7 +2941,7 @@ export class CoreAI_ClosestEnemySensor extends CoreAI_ASensor {
         if (!mod.IsPlayerValid(newEnemy)) {
             // Clear enemy memory (TTL = immediate)
             ctx.memory.set('closestEnemy', null)
-            ctx.memory.set('closestEnemyPos', null)
+            // ctx.memory.set('moveToPos', null)
             return
         }
 
@@ -2986,7 +2959,7 @@ export class CoreAI_ClosestEnemySensor extends CoreAI_ASensor {
 
         // Write memory with TTL
         ctx.memory.set('closestEnemy', newEnemy, this.ttlMs)
-        ctx.memory.set('closestEnemyPos', enemyPos, this.ttlMs)
+        ctx.memory.set('moveToPos', enemyPos, this.ttlMs)
     }
 }
 
@@ -3062,7 +3035,7 @@ export class CoreAI_ArrivalSensor extends CoreAI_ASensor {
     }
 }
 
-// -------- FILE: src\Core\AI\Modules\Perception\Sensors\MoveToSensor.ts --------
+// -------- FILE: src\Core\AI\Modules\Perception\Sensors\MoveTo\OnfootMoveToSensor.ts --------
 /**
  * MoveToSensor:
  * Picks a movement target from a list of points.
@@ -3073,7 +3046,7 @@ export class CoreAI_ArrivalSensor extends CoreAI_ASensor {
  * - Velocity is preferred when speed > threshold.
  * - Intent direction stabilizes steering across replans.
  */
-export class CoreAI_MoveToSensor extends CoreAI_ASensor {
+export class CoreAI_OnfootMoveToSensor extends CoreAI_ASensor {
     private readonly ttlMs: number
 
     private coldStart: boolean = true
@@ -3098,6 +3071,9 @@ export class CoreAI_MoveToSensor extends CoreAI_ASensor {
     protected update(ctx: CoreAI_SensorContext): void {
         const player = ctx.player
         if (!mod.IsPlayerValid(player)) return
+        if (mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle)) {
+            return
+        }
 
         // Do not reselect while intent exists
         if (ctx.memory.get('moveToPos')) return
@@ -3233,7 +3209,7 @@ export class CoreAI_MoveToSensor extends CoreAI_ASensor {
     }
 }
 
-// -------- FILE: src\Core\AI\Modules\Perception\Sensors\MoveToCapturePointSensor.ts --------
+// -------- FILE: src\Core\AI\Modules\Perception\Sensors\MoveTo\CapturePointMoveToSensor.ts --------
 /**
  * MoveToCapturePointSensor
  *
@@ -3256,7 +3232,7 @@ export class CoreAI_MoveToSensor extends CoreAI_ASensor {
  * - Selection is distance-based only; higher-level pressure or
  *   role-based logic can be layered later.
  */
-export class CoreAI_MoveToCapturePointSensor extends CoreAI_ASensor {
+export class CoreAI_CapturePointMoveToSensor extends CoreAI_ASensor {
     private readonly ttlMs: number
 
     constructor(
@@ -3333,7 +3309,7 @@ export class CoreAI_MoveToCapturePointSensor extends CoreAI_ASensor {
     }
 }
 
-// -------- FILE: src\Core\AI\Modules\Perception\Sensors\VehicleMoveToSensor.ts --------
+// -------- FILE: src\Core\AI\Modules\Perception\Sensors\MoveTo\DriverMoveToSensor.ts --------
 /**
  * MoveToSensor:
  * Picks a movement target from a list of points.
@@ -3344,7 +3320,7 @@ export class CoreAI_MoveToCapturePointSensor extends CoreAI_ASensor {
  * - Velocity is preferred when speed > threshold.
  * - Intent direction stabilizes steering across replans.
  */
-export class CoreAI_VehicleMoveToSensor extends CoreAI_ASensor {
+export class CoreAI_DriverMoveToSensor extends CoreAI_ASensor {
     private readonly ttlMs: number
 
     private coldStart: boolean = true
@@ -3369,6 +3345,9 @@ export class CoreAI_VehicleMoveToSensor extends CoreAI_ASensor {
     protected update(ctx: CoreAI_SensorContext): void {
         const player = ctx.player
         if (!mod.IsPlayerValid(player)) return
+        if (!mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle)) {
+            return
+        }
 
         // Do not reselect while intent exists
         if (ctx.memory.get('moveToPos')) return
@@ -3520,19 +3499,19 @@ export interface CoreAI_CombatantProfileOptions {
         ttlMs?: number
     }
     arrivalSensor?: {
-        getDefendWPs?: () => mod.Vector[]
+        getWPs?: () => mod.Vector[]
         intervalMs?: number
         distanceThreshold?: number
         ttlMs?: number
         cooldownMs?: number
     }
-    moveToSensor?: {
-        getRoamWPs?: () => mod.Vector[]
+    onfootMoveToSensor?: {
+        getWPs?: () => mod.Vector[]
         intervalMs?: number
         ttlMs?: number
     }
-    vehicleMoveToSensor?: {
-        getVehicleWPs?: () => mod.Vector[]
+    driverMoveToSensor?: {
+        getWPs?: () => mod.Vector[]
         intervalMs?: number
         ttlMs?: number
     }
@@ -3547,6 +3526,25 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
     constructor(options: CoreAI_CombatantProfileOptions = {}) {
         super()
 
+        const getMoveMode = (brain: { player: mod.Player }) => {
+            const player = brain.player
+            if (!mod.IsPlayerValid(player)) return 'onfoot'
+
+            const inVehicle = mod.GetSoldierState(
+                player,
+                mod.SoldierStateBool.IsInVehicle
+            )
+            if (!inVehicle) return 'onfoot'
+
+            const vehicle = mod.GetVehicleFromPlayer(player)
+            if (!vehicle) return 'onfoot'
+
+            const driver = mod.GetPlayerFromVehicleSeat(vehicle, 0)
+            return mod.IsPlayerValid(driver) && mod.Equals(driver, player)
+                ? 'driver'
+                : 'onfoot'
+        }
+
         this.scoring = [
             {
                 score: (brain) => {
@@ -3559,10 +3557,12 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
             {
                 score: (brain) => (brain.memory.get('closestEnemy') ? 150 : 0),
                 factory: (brain) =>
-                    new CoreAI_ClosestEnemyBehavior(
+                    new CoreAI_MoveToBehavior(
                         brain,
-                        brain.memory.get('closestEnemy')!,
-                        mod.MoveSpeed.InvestigateRun
+                        brain.memory.get('moveToPos')!,
+                        mod.MoveSpeed.InvestigateRun,
+                        brain.memory.get('closestEnemy'),
+                        getMoveMode(brain)
                     ),
             },
 
@@ -3585,7 +3585,9 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
                         brain.memory.get('moveToPos')!,
                         Math.random() < 0.3
                             ? mod.MoveSpeed.Sprint
-                            : mod.MoveSpeed.Run
+                            : mod.MoveSpeed.Run,
+                        null,
+                        getMoveMode(brain)
                     ),
             },
         ] as CoreAI_ITaskScoringEntry[]
@@ -3604,11 +3606,11 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
                 ),
         ]
 
-        if (options.arrivalSensor?.getDefendWPs) {
+        if (options.arrivalSensor?.getWPs) {
             this.sensors.push(
                 () =>
                     new CoreAI_ArrivalSensor(
-                        () => options.arrivalSensor!.getDefendWPs!(),
+                        () => options.arrivalSensor!.getWPs!(),
                         options.arrivalSensor?.intervalMs,
                         options.arrivalSensor?.distanceThreshold,
                         options.arrivalSensor?.ttlMs,
@@ -3620,7 +3622,7 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
         if (options.moveToCapturePointSensor?.getCapturePoints) {
             this.sensors.push(
                 () =>
-                    new CoreAI_MoveToCapturePointSensor(
+                    new CoreAI_CapturePointMoveToSensor(
                         () =>
                             options.moveToCapturePointSensor!
                                 .getCapturePoints!(),
@@ -3630,24 +3632,24 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
             )
         }
 
-        if (options.moveToSensor?.getRoamWPs) {
+        if (options.onfootMoveToSensor?.getWPs) {
             this.sensors.push(
                 () =>
-                    new CoreAI_MoveToSensor(
-                        () => options.moveToSensor!.getRoamWPs!(),
-                        options.moveToSensor?.intervalMs,
-                        options.moveToSensor?.ttlMs
+                    new CoreAI_OnfootMoveToSensor(
+                        () => options.onfootMoveToSensor!.getWPs!(),
+                        options.onfootMoveToSensor?.intervalMs,
+                        options.onfootMoveToSensor?.ttlMs
                     )
             )
         }
 
-        if (options.vehicleMoveToSensor?.getVehicleWPs) {
+        if (options.driverMoveToSensor?.getWPs) {
             this.sensors.push(
                 () =>
-                    new CoreAI_VehicleMoveToSensor(
-                        () => options.vehicleMoveToSensor!.getVehicleWPs!(),
-                        options.vehicleMoveToSensor?.intervalMs,
-                        options.vehicleMoveToSensor?.ttlMs
+                    new CoreAI_DriverMoveToSensor(
+                        () => options.driverMoveToSensor!.getWPs!(),
+                        options.driverMoveToSensor?.intervalMs,
+                        options.driverMoveToSensor?.ttlMs
                     )
             )
         }
@@ -3702,190 +3704,6 @@ export class BrainComponent implements CorePlayer_IComponent {
      */
     onRebind(newPlayer: mod.Player): void {
         this.brain.player = newPlayer
-    }
-}
-
-// -------- FILE: src\Core\AI\Modules\Behavior\Behaviors\FollowBehavior.ts --------
-export class CoreAI_FollowBehavior extends CoreAI_ABehavior {
-    public name = 'follow'
-
-    private readonly getPos: () => mod.Vector | null
-    private lastPos: mod.Vector | null = null
-
-    constructor(
-        brain: CoreAI_Brain,
-        getPos: () => mod.Vector | null,
-        intervalMs: number = 5000 // safe, avoids engine stutter
-    ) {
-        super(brain)
-        this.getPos = getPos
-        this.intervalMs = intervalMs
-    }
-
-    override enter(): void {
-        this.lastPos = this.getPos()
-        this.issueMove()
-    }
-
-    override update(): void {
-        const pos = this.getPos()
-        if (!pos) return
-
-        if (pos !== this.lastPos) {
-            this.lastPos = pos
-            this.issueMove()
-        }
-    }
-
-    private issueMove(): void {
-        const pos = this.lastPos
-        if (!pos) return
-
-        const player = this.brain.player
-        if (!mod.IsPlayerValid(player)) return
-
-        const myPos = mod.GetObjectPosition(player)
-        const dist = mod.DistanceBetween(myPos, pos)
-
-        // dynamic speed logic
-        let speed: mod.MoveSpeed
-        if (dist > 20) speed = mod.MoveSpeed.Sprint
-        else if (dist > 10) speed = mod.MoveSpeed.Run
-        else speed = mod.MoveSpeed.InvestigateRun
-
-        mod.AISetMoveSpeed(player, speed)
-        mod.AIValidatedMoveToBehavior(player, pos)
-    }
-}
-
-// -------- FILE: src\Core\AI\Profiles\FollowerProfile.ts --------
-export interface CoreAI_FollowerProfileOptions {
-    getPoint?: () => mod.Vector | null
-    fightSensor?: {
-        intervalMs?: number
-        ttlMs?: number
-    }
-    closestEnemySensor?: {
-        sensitivity?: number
-        intervalMs?: number
-        ttlMs?: number
-    }
-    arrivalSensor?: {
-        intervalMs?: number
-        distanceThreshold?: number
-        ttlMs?: number
-        cooldownMs?: number
-    }
-    followBehavior?: {
-        intervalMs?: number
-    }
-}
-
-export class CoreAI_FollowerProfile extends CoreAI_AProfile {
-    constructor(private readonly options: CoreAI_FollowerProfileOptions = {}) {
-        super()
-
-        const getPoint = options.getPoint ?? (() => null)
-
-        this.scoring = [
-            // Fight has top priority
-            {
-                score: (brain) => {
-                    return brain.memory.get('isFiring') ||
-                        brain.memory.get('damagedBy')
-                        ? 200
-                        : 0
-                },
-                factory: (brain) => new CoreAI_FightBehavior(brain),
-            },
-
-            // Closest enemy
-            {
-                score: (brain) => {
-                    return brain.memory.get('closestEnemy') ? 150 : 0
-                },
-                factory: (brain) =>
-                    new CoreAI_ClosestEnemyBehavior(
-                        brain,
-                        brain.memory.get('closestEnemy')!,
-                        mod.MoveSpeed.InvestigateRun
-                    ),
-            },
-
-            // Defend when arrived
-            {
-                score: (brain) => (brain.memory.get('arrivedPos') ? 100 : 0),
-                factory: (brain) =>
-                    new CoreAI_DefendBehavior(
-                        brain,
-                        brain.memory.get('arrivedPos')!,
-                        1.0,
-                        6.0
-                    ),
-            },
-
-            // Follow (always enabled)
-            {
-                score: (brain) => {
-                    const target = getPoint()
-                    if (!target) return 0
-
-                    const myPos = mod.GetObjectPosition(brain.player)
-                    const dist = mod.DistanceBetween(myPos, target)
-
-                    // If far from leader, high priority
-                    if (
-                        dist > 8.0 &&
-                        dist < 40.0 &&
-                        !brain.memory.get('closestEnemy')
-                    ) {
-                        return 250
-                    }
-
-                    // If close, normal follow priority
-                    return 50
-                },
-                factory: (brain) => {
-                    return new CoreAI_FollowBehavior(
-                        brain,
-                        getPoint,
-                        options.followBehavior?.intervalMs
-                    )
-                },
-            },
-
-            {
-                score: () => 1,
-                factory: (brain) => new CoreAI_IdleBehavior(brain),
-            },
-        ] as CoreAI_ITaskScoringEntry[]
-
-        this.sensors = [
-            () =>
-                new CoreAI_FightSensor(
-                    options.fightSensor?.intervalMs,
-                    options.fightSensor?.ttlMs
-                ),
-            () =>
-                new CoreAI_ClosestEnemySensor(
-                    options.closestEnemySensor?.sensitivity,
-                    options.closestEnemySensor?.intervalMs,
-                    options.closestEnemySensor?.ttlMs
-                ),
-
-            // Arrival sensor only
-            () =>
-                new CoreAI_ArrivalSensor(
-                    () => {
-                        const p = getPoint()
-                        return p ? [p] : []
-                    },
-                    options.arrivalSensor?.intervalMs,
-                    options.arrivalSensor?.distanceThreshold,
-                    options.arrivalSensor?.ttlMs,
-                    options.arrivalSensor?.cooldownMs
-                ),
-        ]
     }
 }
 
@@ -3970,9 +3788,23 @@ export class CoreAI_Squad {
             return
         }
 
-        // Assign follower profile
-        const profile = new CoreAI_FollowerProfile({
-            getPoint: () => this.getSquadPoint(),
+        // Assign combatant profile configured to follow leader
+        const profile = new CoreAI_CombatantProfile({
+            onfootMoveToSensor: {
+                getWPs: () => {
+                    const p = this.getSquadPoint()
+                    return p ? [p] : []
+                },
+            },
+            arrivalSensor: {
+                getWPs: () => {
+                    const p = this.getSquadPoint()
+                    return p ? [p] : []
+                },
+                cooldownMs: 0,
+                distanceThreshold: 5,
+                ttlMs: 4000,
+            },
         })
         brainComp.brain.installProfile(profile)
     }
@@ -4226,7 +4058,7 @@ export class PG_GameMode extends Core_AGameMode {
 
     private AI_UNSPAWN_DELAY = 10
     private AI_COUNT_TEAM_1 = 1
-    private AI_COUNT_TEAM_2 = 1
+    private AI_COUNT_TEAM_2 = 0
 
     private squadManager: Core_SquadManager | null = null
 
@@ -4304,16 +4136,25 @@ export class PG_GameMode extends Core_AGameMode {
 
         // Attach AI brain to logical AI players only
         if (lp.isLogicalAI()) {
-            if (lp.teamId === 1) {
+            /* if (lp.teamId === 1) {
                 await mod.Wait(5)
                 mod.ForcePlayerToSeat(lp.player, this.vehicle!, -1)
-            }
+            } */
 
             const brain = new CoreAI_Brain(
                 lp.player,
                 new CoreAI_CombatantProfile({
-                    vehicleMoveToSensor: {
-                        getVehicleWPs: () => /* this.getRoamWps(1100, 1105) */ [
+                    onfootMoveToSensor: {
+                        getWPs: () => this.getOnfootWPs(1000, 1010),
+                        /* [
+                                mod.GetObjectPosition(
+                                    this.playerManager.getById(0)!.player
+                                ),
+                            ], */
+                        ttlMs: 10000,
+                    },
+                    driverMoveToSensor: {
+                        getWPs: () => [
                             mod.GetObjectPosition(mod.GetHQ(1)),
                             mod.GetObjectPosition(mod.GetHQ(3)),
                             mod.GetObjectPosition(mod.GetHQ(4)),
@@ -4321,7 +4162,7 @@ export class PG_GameMode extends Core_AGameMode {
                         ttlMs: 20000,
                     },
                     arrivalSensor: {
-                        getDefendWPs: () => [],
+                        getWPs: () => [],
                         ttlMs: 4000,
                     },
                 }),
@@ -4332,11 +4173,11 @@ export class PG_GameMode extends Core_AGameMode {
         }
 
         // Ensure squad system exists and register the player
-        /* if (!this.squadManager) {
+        if (!this.squadManager) {
             this.squadManager = new Core_SquadManager(this, 2)
         }
 
-        this.squadManager.addToSquad(lp) */
+        this.squadManager.addToSquad(lp)
     }
 
     protected override OnPlayerLeaveGame(eventNumber: number): void {
@@ -4353,7 +4194,7 @@ export class PG_GameMode extends Core_AGameMode {
         }
     }
 
-    private getRoamWps(from: number, to: number): mod.Vector[] {
+    private getOnfootWPs(from: number, to: number): mod.Vector[] {
         const out: mod.Vector[] = []
 
         for (let id = from; id <= to; id++) {

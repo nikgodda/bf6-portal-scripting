@@ -14,7 +14,7 @@ export class PG_GameMode extends Core_AGameMode {
 
     private AI_UNSPAWN_DELAY = 10
     private AI_COUNT_TEAM_1 = 1
-    private AI_COUNT_TEAM_2 = 1
+    private AI_COUNT_TEAM_2 = 0
 
     private squadManager: Core_SquadManager | null = null
 
@@ -92,16 +92,25 @@ export class PG_GameMode extends Core_AGameMode {
 
         // Attach AI brain to logical AI players only
         if (lp.isLogicalAI()) {
-            if (lp.teamId === 1) {
+            /* if (lp.teamId === 1) {
                 await mod.Wait(5)
                 mod.ForcePlayerToSeat(lp.player, this.vehicle!, -1)
-            }
+            } */
 
             const brain = new CoreAI_Brain(
                 lp.player,
                 new CoreAI_CombatantProfile({
-                    vehicleMoveToSensor: {
-                        getVehicleWPs: () => /* this.getRoamWps(1100, 1105) */ [
+                    onfootMoveToSensor: {
+                        getWPs: () => this.getOnfootWPs(1000, 1010),
+                        /* [
+                                mod.GetObjectPosition(
+                                    this.playerManager.getById(0)!.player
+                                ),
+                            ], */
+                        ttlMs: 10000,
+                    },
+                    driverMoveToSensor: {
+                        getWPs: () => [
                             mod.GetObjectPosition(mod.GetHQ(1)),
                             mod.GetObjectPosition(mod.GetHQ(3)),
                             mod.GetObjectPosition(mod.GetHQ(4)),
@@ -109,7 +118,7 @@ export class PG_GameMode extends Core_AGameMode {
                         ttlMs: 20000,
                     },
                     arrivalSensor: {
-                        getDefendWPs: () => [],
+                        getWPs: () => [],
                         ttlMs: 4000,
                     },
                 }),
@@ -120,11 +129,11 @@ export class PG_GameMode extends Core_AGameMode {
         }
 
         // Ensure squad system exists and register the player
-        /* if (!this.squadManager) {
+        if (!this.squadManager) {
             this.squadManager = new Core_SquadManager(this, 2)
         }
 
-        this.squadManager.addToSquad(lp) */
+        this.squadManager.addToSquad(lp)
     }
 
     protected override OnPlayerLeaveGame(eventNumber: number): void {
@@ -141,7 +150,7 @@ export class PG_GameMode extends Core_AGameMode {
         }
     }
 
-    private getRoamWps(from: number, to: number): mod.Vector[] {
+    private getOnfootWPs(from: number, to: number): mod.Vector[] {
         const out: mod.Vector[] = []
 
         for (let id = from; id <= to; id++) {
