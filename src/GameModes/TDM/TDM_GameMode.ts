@@ -21,6 +21,7 @@ export class TDM_GameMode extends Core_AGameMode {
     private teamScores = new Map<number, number>()
 
     protected override OnGameModeStarted(): void {
+        // One-time game setup (rules, scoreboard, AI bootstrap)
         mod.SetAIToHumanDamageModifier(2)
 
         mod.SetGameModeTargetScore(this.TARGET_SCORE)
@@ -35,6 +36,7 @@ export class TDM_GameMode extends Core_AGameMode {
         )
         mod.SetScoreboardColumnWidths(1, 0.5, 0.5, 0.5, 0.5)
 
+        // Spawn initial logical bots
         for (let i = 1; i <= this.AI_COUNT_TEAM_1; i++) {
             mod.Wait(0.5).then(() =>
                 this.playerManager.spawnLogicalBot(
@@ -61,7 +63,7 @@ export class TDM_GameMode extends Core_AGameMode {
     }
 
     protected override OnLogicalPlayerJoinGame(lp: CorePlayer_APlayer): void {
-        // Set AI Brain
+        // Attach AI brain to logical AI players only
         if (lp.isLogicalAI()) {
             const brain = new CoreAI_Brain(
                 lp.player,
@@ -80,6 +82,7 @@ export class TDM_GameMode extends Core_AGameMode {
             lp.addComponent(new BrainComponent(brain))
         }
 
+        // Ensure squad system exists and register the player
         if (!this.squadManager) {
             this.squadManager = new Core_SquadManager(this, 2)
         }
@@ -91,7 +94,7 @@ export class TDM_GameMode extends Core_AGameMode {
         const lp = this.playerManager.getById(eventNumber)
         if (!lp) return
 
-        // Respawn persistent bot
+        // Keep logical AI persistent by respawning its identity
         if (lp.isLogicalAI()) {
             this.playerManager.respawnLogicalBot(
                 lp,
@@ -114,6 +117,7 @@ export class TDM_GameMode extends Core_AGameMode {
             return
         }
 
+        // Team score increments only on enemy kills
         const teamScore = this.addTeamScore(team, 1)
 
         mod.SetGameModeScore(team, teamScore)
@@ -135,6 +139,7 @@ export class TDM_GameMode extends Core_AGameMode {
     }
 
     private addTeamScore(team: mod.Team, deltaScore: number): number {
+        // Local cache avoids race conditions on rapid multi-kill events
         const teamId = mod.GetObjId(team)
         const currentScore =
             this.teamScores.get(teamId) ?? mod.GetGameModeScore(team)
