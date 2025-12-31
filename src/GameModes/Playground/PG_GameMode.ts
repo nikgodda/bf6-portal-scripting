@@ -60,7 +60,7 @@ export class PG_GameMode extends Core_AGameMode {
         mod.Wait(5).then(() => {
             mod.SetVehicleSpawnerVehicleType(
                 vehicleSpawner,
-                mod.VehicleList.Abrams
+                mod.VehicleList.Eurocopter
             )
             mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
         })
@@ -71,16 +71,16 @@ export class PG_GameMode extends Core_AGameMode {
      */
 
     protected override OnVehicleSpawned(eventVehicle: mod.Vehicle): void {
-        if (!mod.CompareVehicleName(eventVehicle, mod.VehicleList.Abrams)) {
+        /* if (!mod.CompareVehicleName(eventVehicle, mod.VehicleList.Marauder)) {
+            return
+        } */
+        const lp = this.playerManager.getById(1)
+        if (!lp) {
             return
         }
 
-        mod.Wait(5).then(() => {
-            mod.ForcePlayerToSeat(
-                this.playerManager.getById(1)!.player,
-                eventVehicle,
-                -1
-            )
+        mod.Wait(10).then(() => {
+            mod.ForcePlayerToSeat(lp.player, eventVehicle, -1)
         })
     }
 

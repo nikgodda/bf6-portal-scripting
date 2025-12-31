@@ -36,6 +36,8 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
     }
 
     override async enter(): Promise<void> {
+        mod.DisplayHighlightedWorldLogMessage(mod.Message(999))
+
         /* console.log(
             mod.XComponentOf(this.targetPos),
             ' ',

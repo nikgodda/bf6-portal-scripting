@@ -121,8 +121,6 @@ export class CoreAI_Brain {
      * ------------------------------------------------------------ */
 
     onMoveFinished(success: boolean): void {
-        // mod.DisplayHighlightedWorldLogMessage(mod.Message(454))
-
         this.memory.set('moveToPos', null)
         this.emit('OnMoveFinished', success)
     }
