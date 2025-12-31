@@ -128,6 +128,32 @@ export class CoreAI_Brain {
     }
 
     /* ------------------------------------------------------------
+     * Damage event
+     * ------------------------------------------------------------ */
+
+    onDamaged(
+        eventOtherPlayer: mod.Player,
+        eventDamageType: mod.DamageType,
+        eventWeaponUnlock: mod.WeaponUnlock
+    ): void {
+        const fightSensor = this.getSensor(CoreAI_FightSensor)
+        if (!fightSensor) return
+
+        const sensorCtx: CoreAI_SensorContext = {
+            player: this.player,
+            memory: this.memory,
+            time: this.memory.time,
+        }
+
+        fightSensor.onDamaged?.(
+            sensorCtx,
+            eventOtherPlayer,
+            eventDamageType,
+            eventWeaponUnlock
+        )
+    }
+
+    /* ------------------------------------------------------------
      * Raycast hit event
      * ------------------------------------------------------------ */
 

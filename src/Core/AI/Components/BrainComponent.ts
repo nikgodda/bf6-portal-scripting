@@ -27,6 +27,10 @@ export class CoreAI_BrainComponent implements CorePlayer_IComponent {
             OngoingPlayer: () => {
                 this.brain.tick()
             },
+            OnPlayerDamaged: (other, damageType, weapon) => {
+                if (!other) return
+                this.brain.onDamaged(other.player, damageType, weapon)
+            },
             OnRayCastHit: (eventPoint, eventNormal) => {
                 this.brain.onRayCastHit(eventPoint, eventNormal)
             },

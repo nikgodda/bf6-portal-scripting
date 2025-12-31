@@ -2529,19 +2529,28 @@ export interface CoreAI_IBrainEvents {
  */
 export class CoreAI_FightSensor extends CoreAI_ASensor {
     constructor(
-        intervalMs: number = 1000,
+        intervalMs: number = 500,
         private readonly ttlMs: number = 10000
     ) {
         super(intervalMs)
     }
 
     protected update(ctx: CoreAI_SensorContext): void {
-        if (ctx.memory.get('isInBattle')) {
+        const player = ctx.player
+        if (!mod.IsPlayerValid(player)) return
+
+        const isFiring = mod.GetSoldierState(
+            player,
+            mod.SoldierStateBool.IsFiring
+        )
+        if (isFiring) {
+            ctx.memory.set('isInBattle', true, this.ttlMs)
             return
         }
 
-        const player = ctx.player
-        if (!mod.IsPlayerValid(player)) return
+        if (ctx.memory.get('isInBattle')) {
+            return
+        }
 
         const myEyesPos = mod.GetSoldierState(
             player,
@@ -2589,14 +2598,17 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
         const enemyPos = mod.GetObjectPosition(enemy)
         const hitDist = mod.DistanceBetween(eventPoint, enemyPos)
 
-        // mod.DisplayHighlightedWorldLogMessage(mod.Message(hitDist))
-
         if (hitDist > 1.0) return
 
-        mod.DisplayHighlightedWorldLogMessage(
-            mod.Message(ctx.memory.get('isInBattle') ? 111 : 222)
-        )
+        ctx.memory.set('isInBattle', true, this.ttlMs)
+    }
 
+    override onDamaged?(
+        ctx: CoreAI_SensorContext,
+        eventOtherPlayer: mod.Player,
+        eventDamageType: mod.DamageType,
+        eventWeaponUnlock: mod.WeaponUnlock
+    ): void {
         ctx.memory.set('isInBattle', true, this.ttlMs)
     }
 }
@@ -2717,6 +2729,32 @@ export class CoreAI_Brain {
 
         this.memory.set('moveToPos', null)
         this.emit('OnMoveFinished', success)
+    }
+
+    /* ------------------------------------------------------------
+     * Damage event
+     * ------------------------------------------------------------ */
+
+    onDamaged(
+        eventOtherPlayer: mod.Player,
+        eventDamageType: mod.DamageType,
+        eventWeaponUnlock: mod.WeaponUnlock
+    ): void {
+        const fightSensor = this.getSensor(CoreAI_FightSensor)
+        if (!fightSensor) return
+
+        const sensorCtx: CoreAI_SensorContext = {
+            player: this.player,
+            memory: this.memory,
+            time: this.memory.time,
+        }
+
+        fightSensor.onDamaged?.(
+            sensorCtx,
+            eventOtherPlayer,
+            eventDamageType,
+            eventWeaponUnlock
+        )
     }
 
     /* ------------------------------------------------------------
@@ -3784,6 +3822,10 @@ export class CoreAI_BrainComponent implements CorePlayer_IComponent {
         ap.addListener({
             OngoingPlayer: () => {
                 this.brain.tick()
+            },
+            OnPlayerDamaged: (other, damageType, weapon) => {
+                if (!other) return
+                this.brain.onDamaged(other.player, damageType, weapon)
             },
             OnRayCastHit: (eventPoint, eventNormal) => {
                 this.brain.onRayCastHit(eventPoint, eventNormal)
