@@ -5,11 +5,9 @@
         "brain": {
           "behaviors": {
             "fight": "fight",
-            "closestenemy": "closestenemy",
             "defend": "defend",
             "idle": "idle",
-            "moveto": "moveto",
-            "follow": "follow"
+            "moveto": "moveto"
           },
           "distance": "dis: {} | tea: {}",
           "memory": {
