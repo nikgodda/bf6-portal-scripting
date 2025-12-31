@@ -34,14 +34,16 @@ export class CoreAI_OnfootMoveToSensor extends CoreAI_ASensor {
     }
 
     protected update(ctx: CoreAI_SensorContext): void {
+        // Do not reselect while intent exists
+        if (ctx.memory.get('moveToPos')) {
+            return
+        }
+
         const player = ctx.player
         if (!mod.IsPlayerValid(player)) return
         if (mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle)) {
             return
         }
-
-        // Do not reselect while intent exists
-        if (ctx.memory.get('moveToPos')) return
 
         const points = this.getPoints()
         if (!points || points.length === 0) return

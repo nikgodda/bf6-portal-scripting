@@ -56,6 +56,12 @@ export abstract class CoreAI_ASensor {
         eventWeaponUnlock: mod.WeaponUnlock
     ): void {}
 
+    onRayCastHit?(
+        ctx: CoreAI_SensorContext,
+        eventPoint: mod.Vector,
+        eventNormal: mod.Vector
+    ): void {}
+
     reset(): void {
         this.lastUpdate = 0
     }

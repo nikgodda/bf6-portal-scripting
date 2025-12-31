@@ -73,7 +73,7 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
             {
                 score: (brain) => {
                     const m = brain.memory
-                    return m.get('isFiring') || m.get('damagedBy') ? 200 : 0
+                    return m.get('isInBattle') ? 200 : 0
                 },
                 factory: (brain) => new CoreAI_FightBehavior(brain),
             },

@@ -3,47 +3,87 @@ import { CoreAI_SensorContext } from './SensorContext'
 
 /**
  * FightSensor:
- * Detects weapon firing.
+ * Detects combat by raycasting toward nearby enemies.
  *
  * Writes:
- * - memory.isFiring (TTL-based boolean)
+ * - memory.isInBattle (TTL-based boolean)
  *
  * Notes:
- * - Damage events are handled directly by the Brain.
+ * - OnRayCastHit is used to confirm nearby enemy presence.
  * - No POIs.
  * - No behaviors spawned.
- * - TaskSelector checks memory.isFiring to understand combat state.
+ * - TaskSelector checks memory.isInBattle to understand combat state.
  */
 export class CoreAI_FightSensor extends CoreAI_ASensor {
     constructor(
-        intervalMs: number = 50,
-        private readonly ttlMs: number = 5000
+        intervalMs: number = 1000,
+        private readonly ttlMs: number = 10000
     ) {
         super(intervalMs)
     }
 
     protected update(ctx: CoreAI_SensorContext): void {
+        if (ctx.memory.get('isInBattle')) {
+            return
+        }
+
         const player = ctx.player
         if (!mod.IsPlayerValid(player)) return
 
-        const isFiring = mod.GetSoldierState(
+        const myEyesPos = mod.GetSoldierState(
             player,
-            mod.SoldierStateBool.IsFiring
+            mod.SoldierStateVector.EyePosition
         )
+        const myTeamId = mod.GetObjId(mod.GetTeam(player))
+        const enemyTeam = mod.GetTeam(myTeamId === 1 ? 2 : 1)
 
-        if (!isFiring) return
+        const allPlayers = mod.AllPlayers()
+        const count = mod.CountOf(allPlayers)
 
-        // TTL-based firing flag
-        ctx.memory.set('isFiring', true, this.ttlMs)
+        const RAYCAST_START_OFFSET = 1
+
+        for (let i = 0; i < count; i++) {
+            const p = mod.ValueInArray(allPlayers, i) as mod.Player
+            if (!mod.IsPlayerValid(p)) continue
+            if (!mod.Equals(mod.GetTeam(p), enemyTeam)) continue
+            if (!mod.GetSoldierState(p, mod.SoldierStateBool.IsAlive)) continue
+
+            const targetPos = mod.GetObjectPosition(p)
+            const dir = mod.DirectionTowards(myEyesPos, targetPos)
+            const start = mod.Add(
+                myEyesPos,
+                mod.Multiply(dir, RAYCAST_START_OFFSET)
+            )
+
+            mod.RayCast(player, start, targetPos)
+        }
     }
 
-    override onDamaged?(
+    override onRayCastHit?(
         ctx: CoreAI_SensorContext,
-        eventOtherPlayer: mod.Player,
-        eventDamageType: mod.DamageType,
-        eventWeaponUnlock: mod.WeaponUnlock
+        eventPoint: mod.Vector,
+        eventNormal: mod.Vector
     ): void {
-        // Set damagedBy with configured TTL
-        ctx.memory.set('damagedBy', eventOtherPlayer, this.ttlMs)
+        const player = ctx.player
+        if (!mod.IsPlayerValid(player)) return
+
+        const myTeamId = mod.GetObjId(mod.GetTeam(player))
+        const enemyTeam = mod.GetTeam(myTeamId === 1 ? 2 : 1)
+
+        const enemy = mod.ClosestPlayerTo(eventPoint, enemyTeam)
+        if (!mod.IsPlayerValid(enemy)) return
+
+        const enemyPos = mod.GetObjectPosition(enemy)
+        const hitDist = mod.DistanceBetween(eventPoint, enemyPos)
+
+        // mod.DisplayHighlightedWorldLogMessage(mod.Message(hitDist))
+
+        if (hitDist > 1.0) return
+
+        mod.DisplayHighlightedWorldLogMessage(
+            mod.Message(ctx.memory.get('isInBattle') ? 111 : 222)
+        )
+
+        ctx.memory.set('isInBattle', true, this.ttlMs)
     }
 }

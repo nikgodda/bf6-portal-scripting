@@ -9,8 +9,7 @@
 export type CoreAI_MemoryFields = {
     closestEnemy: mod.Player | null
 
-    damagedBy: mod.Player | null
-    isFiring: boolean
+    isInBattle: boolean
 
     moveToPos: mod.Vector | null // movement target
     arrivedPos: mod.Vector | null // semantic arrival
@@ -24,8 +23,7 @@ export class CoreAI_MemoryManager {
     public data: CoreAI_MemoryFields = {
         closestEnemy: null,
 
-        damagedBy: null,
-        isFiring: false,
+        isInBattle: false,
 
         moveToPos: null,
         arrivedPos: null,
@@ -120,8 +118,7 @@ export class CoreAI_MemoryManager {
         this.data = {
             closestEnemy: null,
 
-            damagedBy: null,
-            isFiring: false,
+            isInBattle: false,
 
             moveToPos: null,
             arrivedPos: null,

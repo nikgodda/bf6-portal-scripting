@@ -13,7 +13,7 @@
           },
           "distance": "dis: {} | tea: {}",
           "memory": {
-            "battle": "fig: {} | def: {} | ene: {}",
+            "battle": "bat: {} | ene: {}",
             "calm": "mov: {} | arr: {}"
           }
         }

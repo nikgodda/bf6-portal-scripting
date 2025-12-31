@@ -13,8 +13,8 @@ export class PG_GameMode extends Core_AGameMode {
     }
 
     private AI_UNSPAWN_DELAY = 10
-    private AI_COUNT_TEAM_1 = 1
-    private AI_COUNT_TEAM_2 = 0
+    private AI_COUNT_TEAM_1 = 0
+    private AI_COUNT_TEAM_2 = 1
 
     private squadManager: Core_SquadManager | null = null
 
@@ -60,10 +60,12 @@ export class PG_GameMode extends Core_AGameMode {
         mod.Wait(5).then(() => {
             mod.SetVehicleSpawnerVehicleType(
                 vehicleSpawner,
-                mod.VehicleList.Vector
+                mod.VehicleList.Abrams
             )
             mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
         })
+
+        mod.GetWaypointPath
     }
 
     /*
@@ -79,13 +81,13 @@ export class PG_GameMode extends Core_AGameMode {
             return
         }
 
-        mod.Wait(10).then(() => {
+        /* mod.Wait(10).then(() => {
             const brainComp = lp.getComponent(CoreAI_BrainComponent)
             if (brainComp) {
                 brainComp.brain.memory.set('moveToPos', null)
             }
             mod.ForcePlayerToSeat(lp.player, eventVehicle, -1)
-        })
+        }) */
     }
 
     protected override OnPlayerExitVehicle(
@@ -113,16 +115,11 @@ export class PG_GameMode extends Core_AGameMode {
                 lp.player,
                 new CoreAI_CombatantProfile({
                     onfootMoveToSensor: {
-                        getWPs: () => this.getOnfootWPs(1000, 1010),
-                        /* [
-                                mod.GetObjectPosition(
-                                    this.playerManager.getById(0)!.player
-                                ),
-                            ], */
+                        getWPs: () => this.geRangeWPs(1000, 1010),
                         ttlMs: 10000,
                     },
                     driverMoveToSensor: {
-                        getWPs: () => this.getOnfootWPs(1100, 1107),
+                        getWPs: () => this.geRangeWPs(1100, 1107),
                         /* [
                             mod.GetObjectPosition(mod.GetHQ(1)),
                             mod.GetObjectPosition(mod.GetHQ(3)),
@@ -163,7 +160,7 @@ export class PG_GameMode extends Core_AGameMode {
         }
     }
 
-    private getOnfootWPs(from: number, to: number): mod.Vector[] {
+    private geRangeWPs(from: number, to: number): mod.Vector[] {
         const out: mod.Vector[] = []
 
         for (let id = from; id <= to; id++) {

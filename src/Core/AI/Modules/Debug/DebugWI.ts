@@ -22,7 +22,7 @@ export class CoreAI_DebugWI {
 
         this.moveTo = mod.SpawnObject(
             mod.RuntimeSpawn_Common.WorldIcon,
-            mod.GetObjectPosition(mod.GetHQ(2)),
+            mod.CreateVector(0, 0, 0),
             mod.CreateVector(0, 0, 0)
         )
         mod.SetWorldIconOwner(this.moveTo, player)
@@ -127,8 +127,7 @@ export class CoreAI_DebugWI {
             this.battle,
             mod.Message(
                 `core.ai.debug.brain.memory.battle`,
-                this.brain.memory.getTimeRemaining('isFiring'),
-                this.brain.memory.getTimeRemaining('damagedBy'),
+                this.brain.memory.getTimeRemaining('isInBattle'),
                 this.brain.memory.getTimeRemaining('closestEnemy')
             )
         )

@@ -14,7 +14,9 @@ export class Player extends CorePlayer_APlayer {
         this.addListener({
             OnPlayerDeployed: () => {
                 // spawn protection
-                this.protectionComp.activate(5)
+                this.protectionComp.activate()
+
+                mod.AIEnableShooting(this.player, false)
             },
         })
     }

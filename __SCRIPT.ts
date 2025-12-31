@@ -1735,8 +1735,7 @@ export abstract class Core_AGameMode<
 export type CoreAI_MemoryFields = {
     closestEnemy: mod.Player | null
 
-    damagedBy: mod.Player | null
-    isFiring: boolean
+    isInBattle: boolean
 
     moveToPos: mod.Vector | null // movement target
     arrivedPos: mod.Vector | null // semantic arrival
@@ -1750,8 +1749,7 @@ export class CoreAI_MemoryManager {
     public data: CoreAI_MemoryFields = {
         closestEnemy: null,
 
-        damagedBy: null,
-        isFiring: false,
+        isInBattle: false,
 
         moveToPos: null,
         arrivedPos: null,
@@ -1846,8 +1844,7 @@ export class CoreAI_MemoryManager {
         this.data = {
             closestEnemy: null,
 
-            damagedBy: null,
-            isFiring: false,
+            isInBattle: false,
 
             moveToPos: null,
             arrivedPos: null,
@@ -1937,6 +1934,12 @@ export abstract class CoreAI_ASensor {
         eventOtherPlayer: mod.Player,
         eventDamageType: mod.DamageType,
         eventWeaponUnlock: mod.WeaponUnlock
+    ): void {}
+
+    onRayCastHit?(
+        ctx: CoreAI_SensorContext,
+        eventPoint: mod.Vector,
+        eventNormal: mod.Vector
     ): void {}
 
     reset(): void {
@@ -2290,7 +2293,7 @@ export class CoreAI_DebugWI {
 
         this.moveTo = mod.SpawnObject(
             mod.RuntimeSpawn_Common.WorldIcon,
-            mod.GetObjectPosition(mod.GetHQ(2)),
+            mod.CreateVector(0, 0, 0),
             mod.CreateVector(0, 0, 0)
         )
         mod.SetWorldIconOwner(this.moveTo, player)
@@ -2395,8 +2398,7 @@ export class CoreAI_DebugWI {
             this.battle,
             mod.Message(
                 `core.ai.debug.brain.memory.battle`,
-                this.brain.memory.getTimeRemaining('isFiring'),
-                this.brain.memory.getTimeRemaining('damagedBy'),
+                this.brain.memory.getTimeRemaining('isInBattle'),
                 this.brain.memory.getTimeRemaining('closestEnemy')
             )
         )
@@ -2514,48 +2516,88 @@ export interface CoreAI_IBrainEvents {
 // -------- FILE: src\Core\AI\Modules\Perception\Sensors\FightSensor.ts --------
 /**
  * FightSensor:
- * Detects weapon firing.
+ * Detects combat by raycasting toward nearby enemies.
  *
  * Writes:
- * - memory.isFiring (TTL-based boolean)
+ * - memory.isInBattle (TTL-based boolean)
  *
  * Notes:
- * - Damage events are handled directly by the Brain.
+ * - OnRayCastHit is used to confirm nearby enemy presence.
  * - No POIs.
  * - No behaviors spawned.
- * - TaskSelector checks memory.isFiring to understand combat state.
+ * - TaskSelector checks memory.isInBattle to understand combat state.
  */
 export class CoreAI_FightSensor extends CoreAI_ASensor {
     constructor(
-        intervalMs: number = 50,
-        private readonly ttlMs: number = 5000
+        intervalMs: number = 1000,
+        private readonly ttlMs: number = 10000
     ) {
         super(intervalMs)
     }
 
     protected update(ctx: CoreAI_SensorContext): void {
+        if (ctx.memory.get('isInBattle')) {
+            return
+        }
+
         const player = ctx.player
         if (!mod.IsPlayerValid(player)) return
 
-        const isFiring = mod.GetSoldierState(
+        const myEyesPos = mod.GetSoldierState(
             player,
-            mod.SoldierStateBool.IsFiring
+            mod.SoldierStateVector.EyePosition
         )
+        const myTeamId = mod.GetObjId(mod.GetTeam(player))
+        const enemyTeam = mod.GetTeam(myTeamId === 1 ? 2 : 1)
 
-        if (!isFiring) return
+        const allPlayers = mod.AllPlayers()
+        const count = mod.CountOf(allPlayers)
 
-        // TTL-based firing flag
-        ctx.memory.set('isFiring', true, this.ttlMs)
+        const RAYCAST_START_OFFSET = 1
+
+        for (let i = 0; i < count; i++) {
+            const p = mod.ValueInArray(allPlayers, i) as mod.Player
+            if (!mod.IsPlayerValid(p)) continue
+            if (!mod.Equals(mod.GetTeam(p), enemyTeam)) continue
+            if (!mod.GetSoldierState(p, mod.SoldierStateBool.IsAlive)) continue
+
+            const targetPos = mod.GetObjectPosition(p)
+            const dir = mod.DirectionTowards(myEyesPos, targetPos)
+            const start = mod.Add(
+                myEyesPos,
+                mod.Multiply(dir, RAYCAST_START_OFFSET)
+            )
+
+            mod.RayCast(player, start, targetPos)
+        }
     }
 
-    override onDamaged?(
+    override onRayCastHit?(
         ctx: CoreAI_SensorContext,
-        eventOtherPlayer: mod.Player,
-        eventDamageType: mod.DamageType,
-        eventWeaponUnlock: mod.WeaponUnlock
+        eventPoint: mod.Vector,
+        eventNormal: mod.Vector
     ): void {
-        // Set damagedBy with configured TTL
-        ctx.memory.set('damagedBy', eventOtherPlayer, this.ttlMs)
+        const player = ctx.player
+        if (!mod.IsPlayerValid(player)) return
+
+        const myTeamId = mod.GetObjId(mod.GetTeam(player))
+        const enemyTeam = mod.GetTeam(myTeamId === 1 ? 2 : 1)
+
+        const enemy = mod.ClosestPlayerTo(eventPoint, enemyTeam)
+        if (!mod.IsPlayerValid(enemy)) return
+
+        const enemyPos = mod.GetObjectPosition(enemy)
+        const hitDist = mod.DistanceBetween(eventPoint, enemyPos)
+
+        // mod.DisplayHighlightedWorldLogMessage(mod.Message(hitDist))
+
+        if (hitDist > 1.0) return
+
+        mod.DisplayHighlightedWorldLogMessage(
+            mod.Message(ctx.memory.get('isInBattle') ? 111 : 222)
+        )
+
+        ctx.memory.set('isInBattle', true, this.ttlMs)
     }
 }
 
@@ -2678,14 +2720,10 @@ export class CoreAI_Brain {
     }
 
     /* ------------------------------------------------------------
-     * Damage event
+     * Raycast hit event
      * ------------------------------------------------------------ */
 
-    onDamaged(
-        eventOtherPlayer: mod.Player,
-        eventDamageType: mod.DamageType,
-        eventWeaponUnlock: mod.WeaponUnlock
-    ): void {
+    onRayCastHit(eventPoint: mod.Vector, eventNormal: mod.Vector): void {
         const fightSensor = this.getSensor(CoreAI_FightSensor)
         if (!fightSensor) return
 
@@ -2695,12 +2733,7 @@ export class CoreAI_Brain {
             time: this.memory.time,
         }
 
-        fightSensor.onDamaged?.(
-            sensorCtx,
-            eventOtherPlayer,
-            eventDamageType,
-            eventWeaponUnlock
-        )
+        fightSensor.onRayCastHit?.(sensorCtx, eventPoint, eventNormal)
     }
 
     /* ------------------------------------------------------------
@@ -2938,6 +2971,7 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
         await mod.Wait(0)
         mod.ForcePlayerToSeat(player, vehicle, 0)
         mod.AISetMoveSpeed(player, mod.MoveSpeed.Sprint)
+        // mod.AIBattlefieldBehavior(player)
         mod.AIDefendPositionBehavior(player, this.targetPos, 0, 4)
         // mod.AIValidatedMoveToBehavior(player, this.targetPos)
     }
@@ -3137,14 +3171,16 @@ export class CoreAI_OnfootMoveToSensor extends CoreAI_ASensor {
     }
 
     protected update(ctx: CoreAI_SensorContext): void {
+        // Do not reselect while intent exists
+        if (ctx.memory.get('moveToPos')) {
+            return
+        }
+
         const player = ctx.player
         if (!mod.IsPlayerValid(player)) return
         if (mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle)) {
             return
         }
-
-        // Do not reselect while intent exists
-        if (ctx.memory.get('moveToPos')) return
 
         const points = this.getPoints()
         if (!points || points.length === 0) return
@@ -3617,7 +3653,7 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
             {
                 score: (brain) => {
                     const m = brain.memory
-                    return m.get('isFiring') || m.get('damagedBy') ? 200 : 0
+                    return m.get('isInBattle') ? 200 : 0
                 },
                 factory: (brain) => new CoreAI_FightBehavior(brain),
             },
@@ -3749,9 +3785,8 @@ export class CoreAI_BrainComponent implements CorePlayer_IComponent {
             OngoingPlayer: () => {
                 this.brain.tick()
             },
-            OnPlayerDamaged: (other, damageType, weapon) => {
-                if (!other) return
-                this.brain.onDamaged(other.player, damageType, weapon)
+            OnRayCastHit: (eventPoint, eventNormal) => {
+                this.brain.onRayCastHit(eventPoint, eventNormal)
             },
             OnAIMoveToSucceeded: () => {
                 this.brain.onMoveFinished(true)
@@ -4105,7 +4140,9 @@ export class Player extends CorePlayer_APlayer {
         this.addListener({
             OnPlayerDeployed: () => {
                 // spawn protection
-                this.protectionComp.activate(5)
+                this.protectionComp.activate()
+
+                mod.AIEnableShooting(this.player, false)
             },
         })
     }
@@ -4125,8 +4162,8 @@ export class PG_GameMode extends Core_AGameMode {
     }
 
     private AI_UNSPAWN_DELAY = 10
-    private AI_COUNT_TEAM_1 = 1
-    private AI_COUNT_TEAM_2 = 0
+    private AI_COUNT_TEAM_1 = 0
+    private AI_COUNT_TEAM_2 = 1
 
     private squadManager: Core_SquadManager | null = null
 
@@ -4172,10 +4209,12 @@ export class PG_GameMode extends Core_AGameMode {
         mod.Wait(5).then(() => {
             mod.SetVehicleSpawnerVehicleType(
                 vehicleSpawner,
-                mod.VehicleList.Vector
+                mod.VehicleList.Abrams
             )
             mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
         })
+
+        mod.GetWaypointPath
     }
 
     /*
@@ -4191,13 +4230,13 @@ export class PG_GameMode extends Core_AGameMode {
             return
         }
 
-        mod.Wait(10).then(() => {
+        /* mod.Wait(10).then(() => {
             const brainComp = lp.getComponent(CoreAI_BrainComponent)
             if (brainComp) {
                 brainComp.brain.memory.set('moveToPos', null)
             }
             mod.ForcePlayerToSeat(lp.player, eventVehicle, -1)
-        })
+        }) */
     }
 
     protected override OnPlayerExitVehicle(
@@ -4225,16 +4264,11 @@ export class PG_GameMode extends Core_AGameMode {
                 lp.player,
                 new CoreAI_CombatantProfile({
                     onfootMoveToSensor: {
-                        getWPs: () => this.getOnfootWPs(1000, 1010),
-                        /* [
-                                mod.GetObjectPosition(
-                                    this.playerManager.getById(0)!.player
-                                ),
-                            ], */
+                        getWPs: () => this.geRangeWPs(1000, 1010),
                         ttlMs: 10000,
                     },
                     driverMoveToSensor: {
-                        getWPs: () => this.getOnfootWPs(1100, 1107),
+                        getWPs: () => this.geRangeWPs(1100, 1107),
                         /* [
                             mod.GetObjectPosition(mod.GetHQ(1)),
                             mod.GetObjectPosition(mod.GetHQ(3)),
@@ -4275,7 +4309,7 @@ export class PG_GameMode extends Core_AGameMode {
         }
     }
 
-    private getOnfootWPs(from: number, to: number): mod.Vector[] {
+    private geRangeWPs(from: number, to: number): mod.Vector[] {
         const out: mod.Vector[] = []
 
         for (let id = from; id <= to; id++) {

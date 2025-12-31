@@ -72,6 +72,7 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
         await mod.Wait(0)
         mod.ForcePlayerToSeat(player, vehicle, 0)
         mod.AISetMoveSpeed(player, mod.MoveSpeed.Sprint)
+        // mod.AIBattlefieldBehavior(player)
         mod.AIDefendPositionBehavior(player, this.targetPos, 0, 4)
         // mod.AIValidatedMoveToBehavior(player, this.targetPos)
     }
