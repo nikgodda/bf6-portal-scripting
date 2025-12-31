@@ -2,15 +2,15 @@ import { CoreAI_AProfile } from './AProfile'
 import { CoreAI_ITaskScoringEntry } from '../Modules/Task/ITaskScoringEntry'
 
 import { CoreAI_FightBehavior } from '../Modules/Behavior/Behaviors/FightBehavior'
-import { CoreAI_ClosestEnemyBehavior } from '../Modules/Behavior/Behaviors/ClosestEnemyBehavior'
 import { CoreAI_DefendBehavior } from '../Modules/Behavior/Behaviors/DefendBehavior'
 import { CoreAI_MoveToBehavior } from '../Modules/Behavior/Behaviors/MoveToBehavior'
 
 import { CoreAI_FightSensor } from '../Modules/Perception/Sensors/FightSensor'
-import { CoreAI_ClosestEnemySensor } from '../Modules/Perception/Sensors/ClosestEnemySensor'
-import { ArrivalSensor } from '../Modules/Perception/Sensors/ArrivalSensor'
-import { MoveToSensor } from '../Modules/Perception/Sensors/MoveToSensor'
-import { MoveToCapturePointSensor } from '../Modules/Perception/Sensors/MoveToCapturePointSensor'
+import { CoreAI_ClosestEnemySensor } from '../Modules/Perception/Sensors/MoveTo/ClosestEnemySensor'
+import { CoreAI_ArrivalSensor } from '../Modules/Perception/Sensors/ArrivalSensor'
+import { CoreAI_OnfootMoveToSensor } from '../Modules/Perception/Sensors/MoveTo/OnfootMoveToSensor'
+import { CoreAI_CapturePointMoveToSensor } from '../Modules/Perception/Sensors/MoveTo/CapturePointMoveToSensor'
+import { CoreAI_DriverMoveToSensor } from '../Modules/Perception/Sensors/MoveTo/DriverMoveToSensor'
 
 export interface CoreAI_CombatantProfileOptions {
     fightSensor?: {
@@ -23,14 +23,19 @@ export interface CoreAI_CombatantProfileOptions {
         ttlMs?: number
     }
     arrivalSensor?: {
-        getDefendWPs?: () => mod.Vector[]
+        getWPs?: () => mod.Vector[]
         intervalMs?: number
         distanceThreshold?: number
         ttlMs?: number
         cooldownMs?: number
     }
-    moveToSensor?: {
-        getRoamWPs?: () => mod.Vector[]
+    onfootMoveToSensor?: {
+        getWPs?: () => mod.Vector[]
+        intervalMs?: number
+        ttlMs?: number
+    }
+    driverMoveToSensor?: {
+        getWPs?: () => mod.Vector[]
         intervalMs?: number
         ttlMs?: number
     }
@@ -45,6 +50,25 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
     constructor(options: CoreAI_CombatantProfileOptions = {}) {
         super()
 
+        const getMoveMode = (brain: { player: mod.Player }) => {
+            const player = brain.player
+            if (!mod.IsPlayerValid(player)) return 'onfoot'
+
+            const inVehicle = mod.GetSoldierState(
+                player,
+                mod.SoldierStateBool.IsInVehicle
+            )
+            if (!inVehicle) return 'onfoot'
+
+            const vehicle = mod.GetVehicleFromPlayer(player)
+            if (!vehicle) return 'onfoot'
+
+            const driver = mod.GetPlayerFromVehicleSeat(vehicle, 0)
+            return mod.IsPlayerValid(driver) && mod.Equals(driver, player)
+                ? 'driver'
+                : 'onfoot'
+        }
+
         this.scoring = [
             {
                 score: (brain) => {
@@ -57,10 +81,12 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
             {
                 score: (brain) => (brain.memory.get('closestEnemy') ? 150 : 0),
                 factory: (brain) =>
-                    new CoreAI_ClosestEnemyBehavior(
+                    new CoreAI_MoveToBehavior(
                         brain,
-                        brain.memory.get('closestEnemy')!,
-                        mod.MoveSpeed.InvestigateRun
+                        brain.memory.get('moveToPos')!,
+                        mod.MoveSpeed.InvestigateRun,
+                        brain.memory.get('closestEnemy'),
+                        getMoveMode(brain)
                     ),
             },
 
@@ -83,7 +109,9 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
                         brain.memory.get('moveToPos')!,
                         Math.random() < 0.3
                             ? mod.MoveSpeed.Sprint
-                            : mod.MoveSpeed.Run
+                            : mod.MoveSpeed.Run,
+                        null,
+                        getMoveMode(brain)
                     ),
             },
         ] as CoreAI_ITaskScoringEntry[]
@@ -102,11 +130,11 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
                 ),
         ]
 
-        if (options.arrivalSensor?.getDefendWPs) {
+        if (options.arrivalSensor?.getWPs) {
             this.sensors.push(
                 () =>
-                    new ArrivalSensor(
-                        () => options.arrivalSensor!.getDefendWPs!(), 
+                    new CoreAI_ArrivalSensor(
+                        () => options.arrivalSensor!.getWPs!(),
                         options.arrivalSensor?.intervalMs,
                         options.arrivalSensor?.distanceThreshold,
                         options.arrivalSensor?.ttlMs,
@@ -118,7 +146,7 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
         if (options.moveToCapturePointSensor?.getCapturePoints) {
             this.sensors.push(
                 () =>
-                    new MoveToCapturePointSensor(
+                    new CoreAI_CapturePointMoveToSensor(
                         () =>
                             options.moveToCapturePointSensor!
                                 .getCapturePoints!(),
@@ -128,13 +156,24 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
             )
         }
 
-        if (options.moveToSensor?.getRoamWPs) {
+        if (options.onfootMoveToSensor?.getWPs) {
             this.sensors.push(
                 () =>
-                    new MoveToSensor(
-                        () => options.moveToSensor!.getRoamWPs!(),
-                        options.moveToSensor?.intervalMs,
-                        options.moveToSensor?.ttlMs
+                    new CoreAI_OnfootMoveToSensor(
+                        () => options.onfootMoveToSensor!.getWPs!(),
+                        options.onfootMoveToSensor?.intervalMs,
+                        options.onfootMoveToSensor?.ttlMs
+                    )
+            )
+        }
+
+        if (options.driverMoveToSensor?.getWPs) {
+            this.sensors.push(
+                () =>
+                    new CoreAI_DriverMoveToSensor(
+                        () => options.driverMoveToSensor!.getWPs!(),
+                        options.driverMoveToSensor?.intervalMs,
+                        options.driverMoveToSensor?.ttlMs
                     )
             )
         }

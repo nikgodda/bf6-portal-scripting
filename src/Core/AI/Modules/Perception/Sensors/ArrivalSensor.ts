@@ -15,7 +15,7 @@ import { CoreAI_SensorContext } from './SensorContext'
  *
  * This sensor is for high-level AI logic only.
  */
-export class ArrivalSensor extends CoreAI_ASensor {
+export class CoreAI_ArrivalSensor extends CoreAI_ASensor {
     private lastTriggerTime = 0
 
     constructor(

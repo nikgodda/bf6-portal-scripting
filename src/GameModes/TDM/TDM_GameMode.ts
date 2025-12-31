@@ -68,11 +68,11 @@ export class TDM_GameMode extends Core_AGameMode {
             const brain = new CoreAI_Brain(
                 lp.player,
                 new CoreAI_CombatantProfile({
-                    moveToSensor: {
-                        getRoamWPs: () => this.getRoamWps(1000, 1010),
+                    onfootMoveToSensor: {
+                        getWPs: () => this.getRoamWps(1000, 1010),
                     },
                     arrivalSensor: {
-                        getDefendWPs: () => this.getRoamWps(1000, 1010),
+                        getWPs: () => this.getRoamWps(1000, 1010),
                         ttlMs: 4000,
                     },
                 }),
