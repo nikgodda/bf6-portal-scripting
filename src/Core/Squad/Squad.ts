@@ -1,7 +1,7 @@
 import { Core_AGameMode } from '../AGameMode'
 import { CorePlayer_APlayer } from '../Player/APlayer'
 import { CoreAI_CombatantProfile } from '../AI/Profiles/CombatantProfile'
-import { BrainComponent } from '../AI/Components/BrainComponent'
+import { CoreAI_BrainComponent } from '../AI/Components/BrainComponent'
 
 export class CoreAI_Squad {
     private members: CorePlayer_APlayer[] = []
@@ -78,7 +78,7 @@ export class CoreAI_Squad {
             return
         }
 
-        const brainComp = ap.getComponent(BrainComponent)
+        const brainComp = ap.getComponent(CoreAI_BrainComponent)
         if (!brainComp) {
             return
         }

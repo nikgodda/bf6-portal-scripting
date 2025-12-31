@@ -6,7 +6,7 @@ import { PlayerManager } from './Player/PlayerManager'
 
 import { CoreAI_CombatantProfile } from 'src/Core/AI/Profiles/CombatantProfile'
 import { CoreAI_Brain } from 'src/Core/AI/Brain'
-import { BrainComponent } from 'src/Core/AI/Components/BrainComponent'
+import { CoreAI_BrainComponent } from 'src/Core/AI/Components/BrainComponent'
 
 import { Core_SquadManager } from 'src/Core/Squad/SquadManager'
 
@@ -108,7 +108,7 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
                 })
             )
 
-            lp.addComponent(new BrainComponent(brain))
+            lp.addComponent(new CoreAI_BrainComponent(brain))
         }
 
         if (!this.squadManager) {

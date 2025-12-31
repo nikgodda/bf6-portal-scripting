@@ -71,7 +71,8 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
         await mod.Wait(0)
         await mod.Wait(0)
         mod.ForcePlayerToSeat(player, vehicle, 0)
-        mod.AIDefendPositionBehavior(player, this.targetPos, 0, 10)
+        mod.AISetMoveSpeed(player, mod.MoveSpeed.Sprint)
+        mod.AIDefendPositionBehavior(player, this.targetPos, 0, 4)
         // mod.AIValidatedMoveToBehavior(player, this.targetPos)
     }
 
@@ -81,8 +82,19 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
     }
 
     override update(): void {
-        // Nothing needed here anymore.
-        // TTL in memory determines when this behavior stops being selected.
+        const player = this.brain.player
+        if (!mod.IsPlayerValid(player)) return
+
+        const memPos = this.brain.memory.get('moveToPos')
+        if (!memPos) return
+
+        const myPos = mod.GetObjectPosition(player)
+        const dist = mod.DistanceBetween(myPos, this.targetPos)
+        const arrivalDist = this.mode === 'driver' ? 10.0 : 3.0
+
+        if (dist < arrivalDist) {
+            this.brain.memory.set('moveToPos', null)
+        }
     }
 
     override exit(): void {

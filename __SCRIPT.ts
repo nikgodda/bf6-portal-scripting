@@ -2034,7 +2034,7 @@ export abstract class CoreAI_ABehavior {
     public abstract name: string
 
     // Throttling interval. Zero means no throttling.
-    protected intervalMs: number = 5000
+    protected intervalMs: number = 1000
 
     private lastUpdateTime: number = 0
 
@@ -2671,6 +2671,8 @@ export class CoreAI_Brain {
      * ------------------------------------------------------------ */
 
     onMoveFinished(success: boolean): void {
+        mod.DisplayHighlightedWorldLogMessage(mod.Message(454))
+
         this.memory.set('moveToPos', null)
         this.emit('OnMoveFinished', success)
     }
@@ -2935,7 +2937,8 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
         await mod.Wait(0)
         await mod.Wait(0)
         mod.ForcePlayerToSeat(player, vehicle, 0)
-        mod.AIDefendPositionBehavior(player, this.targetPos, 0, 10)
+        mod.AISetMoveSpeed(player, mod.MoveSpeed.Sprint)
+        mod.AIDefendPositionBehavior(player, this.targetPos, 0, 4)
         // mod.AIValidatedMoveToBehavior(player, this.targetPos)
     }
 
@@ -2945,8 +2948,19 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
     }
 
     override update(): void {
-        // Nothing needed here anymore.
-        // TTL in memory determines when this behavior stops being selected.
+        const player = this.brain.player
+        if (!mod.IsPlayerValid(player)) return
+
+        const memPos = this.brain.memory.get('moveToPos')
+        if (!memPos) return
+
+        const myPos = mod.GetObjectPosition(player)
+        const dist = mod.DistanceBetween(myPos, this.targetPos)
+        const arrivalDist = this.mode === 'driver' ? 10.0 : 3.0
+
+        if (dist < arrivalDist) {
+            this.brain.memory.set('moveToPos', null)
+        }
     }
 
     override exit(): void {
@@ -3718,7 +3732,7 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
  * AI behavior component attached to a logical player.
  * Created and configured by GameMode.
  */
-export class BrainComponent implements CorePlayer_IComponent {
+export class CoreAI_BrainComponent implements CorePlayer_IComponent {
     public readonly brain: CoreAI_Brain
 
     private ap!: CorePlayer_APlayer
@@ -3837,7 +3851,7 @@ export class CoreAI_Squad {
             return
         }
 
-        const brainComp = ap.getComponent(BrainComponent)
+        const brainComp = ap.getComponent(CoreAI_BrainComponent)
         if (!brainComp) {
             return
         }
@@ -4158,7 +4172,7 @@ export class PG_GameMode extends Core_AGameMode {
         mod.Wait(5).then(() => {
             mod.SetVehicleSpawnerVehicleType(
                 vehicleSpawner,
-                mod.VehicleList.Eurocopter
+                mod.VehicleList.Vector
             )
             mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
         })
@@ -4178,6 +4192,10 @@ export class PG_GameMode extends Core_AGameMode {
         }
 
         mod.Wait(10).then(() => {
+            const brainComp = lp.getComponent(CoreAI_BrainComponent)
+            if (brainComp) {
+                brainComp.brain.memory.set('moveToPos', null)
+            }
             mod.ForcePlayerToSeat(lp.player, eventVehicle, -1)
         })
     }
@@ -4216,13 +4234,13 @@ export class PG_GameMode extends Core_AGameMode {
                         ttlMs: 10000,
                     },
                     driverMoveToSensor: {
-                        getWPs: () => this.getOnfootWPs(1100, 1105),
+                        getWPs: () => this.getOnfootWPs(1100, 1107),
                         /* [
                             mod.GetObjectPosition(mod.GetHQ(1)),
                             mod.GetObjectPosition(mod.GetHQ(3)),
                             mod.GetObjectPosition(mod.GetHQ(4)),
                         ], */
-                        ttlMs: 20000,
+                        ttlMs: 60000,
                     },
                     arrivalSensor: {
                         getWPs: () => [],
@@ -4232,7 +4250,7 @@ export class PG_GameMode extends Core_AGameMode {
                 true
             )
 
-            lp.addComponent(new BrainComponent(brain))
+            lp.addComponent(new CoreAI_BrainComponent(brain))
         }
 
         // Ensure squad system exists and register the player

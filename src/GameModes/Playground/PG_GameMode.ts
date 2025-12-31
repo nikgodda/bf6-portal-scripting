@@ -3,7 +3,7 @@ import { CorePlayer_APlayerManager } from 'src/Core/Player/APlayerManager'
 import { CorePlayer_APlayer } from 'src/Core/Player/APlayer'
 import { CoreAI_Brain } from 'src/Core/AI/Brain'
 import { CoreAI_CombatantProfile } from 'src/Core/AI/Profiles/CombatantProfile'
-import { BrainComponent } from 'src/Core/AI/Components/BrainComponent'
+import { CoreAI_BrainComponent } from 'src/Core/AI/Components/BrainComponent'
 import { Core_SquadManager } from 'src/Core/Squad/SquadManager'
 import { PlayerManager } from './Player/PlayerManager'
 
@@ -60,7 +60,7 @@ export class PG_GameMode extends Core_AGameMode {
         mod.Wait(5).then(() => {
             mod.SetVehicleSpawnerVehicleType(
                 vehicleSpawner,
-                mod.VehicleList.Eurocopter
+                mod.VehicleList.Vector
             )
             mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
         })
@@ -80,6 +80,10 @@ export class PG_GameMode extends Core_AGameMode {
         }
 
         mod.Wait(10).then(() => {
+            const brainComp = lp.getComponent(CoreAI_BrainComponent)
+            if (brainComp) {
+                brainComp.brain.memory.set('moveToPos', null)
+            }
             mod.ForcePlayerToSeat(lp.player, eventVehicle, -1)
         })
     }
@@ -118,13 +122,13 @@ export class PG_GameMode extends Core_AGameMode {
                         ttlMs: 10000,
                     },
                     driverMoveToSensor: {
-                        getWPs: () => this.getOnfootWPs(1100, 1105),
+                        getWPs: () => this.getOnfootWPs(1100, 1107),
                         /* [
                             mod.GetObjectPosition(mod.GetHQ(1)),
                             mod.GetObjectPosition(mod.GetHQ(3)),
                             mod.GetObjectPosition(mod.GetHQ(4)),
                         ], */
-                        ttlMs: 20000,
+                        ttlMs: 60000,
                     },
                     arrivalSensor: {
                         getWPs: () => [],
@@ -134,7 +138,7 @@ export class PG_GameMode extends Core_AGameMode {
                 true
             )
 
-            lp.addComponent(new BrainComponent(brain))
+            lp.addComponent(new CoreAI_BrainComponent(brain))
         }
 
         // Ensure squad system exists and register the player

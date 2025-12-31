@@ -10,7 +10,7 @@ import { CoreAI_Brain } from '../Brain'
  * AI behavior component attached to a logical player.
  * Created and configured by GameMode.
  */
-export class BrainComponent implements CorePlayer_IComponent {
+export class CoreAI_BrainComponent implements CorePlayer_IComponent {
     public readonly brain: CoreAI_Brain
 
     private ap!: CorePlayer_APlayer
