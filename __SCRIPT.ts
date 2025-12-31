@@ -2598,6 +2598,7 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
         const enemyPos = mod.GetObjectPosition(enemy)
         const hitDist = mod.DistanceBetween(eventPoint, enemyPos)
 
+        // TODO find best value
         if (hitDist > 1.0) return
 
         ctx.memory.set('isInBattle', true, this.ttlMs)
