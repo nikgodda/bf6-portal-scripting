@@ -2334,31 +2334,26 @@ export class Player extends CorePlayer_APlayer {
         }) */
 
         this.addListener({
-            OnPlayerDeployed: async () => {
-                /* await mod.Wait(3)
-                mod.PlaySound(
-                    mod.SpawnObject(mod.RuntimeSpawn_Common.closed)
-                ) */
-
-                // loadout
+            OnPlayerDeployed: () => {
+                // Default Loadout
                 const ids = [
                     LoadoutIdMap.Assault_Operator,
                     LoadoutIdMap.Support_Operator,
                     LoadoutIdMap.Rifleman_Operator,
                     LoadoutIdMap.Sniper_Operator,
                 ]
-                const randomId = ids[Math.floor(Math.random() * ids.length)]
 
+                const randomId = ids[Math.floor(Math.random() * ids.length)]
                 const loadout = LoadoutsRegistry.getById(randomId)
 
                 if (loadout) {
                     this.loadoutComp.applyLoadout(loadout)
                 }
 
-                // spawn protection
+                // Spawn protection
                 this.protectionComp.activate(5)
 
-                // stats
+                // Stats
                 this.battleStatsComp.clearKillStreak()
 
                 // BUG: no effect at all
@@ -2366,38 +2361,42 @@ export class Player extends CorePlayer_APlayer {
 
                 // mod.SetPlayerMovementSpeedMultiplier(this.player, 2)
 
-                /*  await mod.Wait(3)
-                mod.DisplayHighlightedWorldLogMessage(mod.Message(132))
-                mod.PlayVO(
-                    mod.SpawnObject(
-                        mod.RuntimeSpawn_Common.SFX_VOModule_OneShot2D,
-                        mod.CreateVector(0, 0, 0),
-                        mod.CreateVector(0, 0, 0)
-                    ),
-                    // mod.VoiceOverEvents2D.ObjectiveCaptured, // we own objective Golf
-                    // mod.VoiceOverEvents2D.ObjectiveCapturedEnemy, // hostiles now control objective Golf
-                    // mod.VoiceOverEvents2D.ObjectiveCapturedEnemyGeneric, // BUG: silence
-                    // mod.VoiceOverEvents2D.ObjectiveCapturedGeneric, // BUG: silence
-                    // mod.VoiceOverEvents2D.ObjectiveCapturing, // BUG: securing ALPHA (always)
-                    // mod.VoiceOverEvents2D.ObjectiveContested, // hostiles are attacking Golf
-                    // mod.VoiceOverEvents2D.ObjectiveLocated, // new objective located
-                    // mod.VoiceOverEvents2D.ObjectiveLockdownEnemy, // Golf has been locked down by the enemy
-                    // mod.VoiceOverEvents2D.ObjectiveLockdownFriendly, // our forces have locked down Golf
-                    // mod.VoiceOverEvents2D.ObjectiveLost, // we've lost control of the objective Golf
-                    // mod.VoiceOverEvents2D.ObjectiveNeutralised, // our forces neutralized Golf
-                    mod.VoiceOverEvents2D.SectorTakenAttacker, // attack successful. we've taken enemy sector
-                    mod.VoiceOverFlags.Golf
-                ) */
+                /*
+                // VO Testing
+                mod.Wait(3).then(() => {
+                    mod.DisplayHighlightedWorldLogMessage(mod.Message(132))
+                    mod.PlayVO(
+                        mod.SpawnObject(
+                            mod.RuntimeSpawn_Common.SFX_VOModule_OneShot2D,
+                            mod.CreateVector(0, 0, 0),
+                            mod.CreateVector(0, 0, 0)
+                        ),
+                        // mod.VoiceOverEvents2D.ObjectiveCaptured, // we own objective Golf
+                        // mod.VoiceOverEvents2D.ObjectiveCapturedEnemy, // hostiles now control objective Golf
+                        // mod.VoiceOverEvents2D.ObjectiveCapturedEnemyGeneric, // BUG: silence
+                        // mod.VoiceOverEvents2D.ObjectiveCapturedGeneric, // BUG: silence
+                        // mod.VoiceOverEvents2D.ObjectiveCapturing, // BUG: securing ALPHA (always)
+                        // mod.VoiceOverEvents2D.ObjectiveContested, // hostiles are attacking Golf
+                        // mod.VoiceOverEvents2D.ObjectiveLocated, // new objective located
+                        // mod.VoiceOverEvents2D.ObjectiveLockdownEnemy, // Golf has been locked down by the enemy
+                        // mod.VoiceOverEvents2D.ObjectiveLockdownFriendly, // our forces have locked down Golf
+                        // mod.VoiceOverEvents2D.ObjectiveLost, // we've lost control of the objective Golf
+                        // mod.VoiceOverEvents2D.ObjectiveNeutralised, // our forces neutralized Golf
+                        mod.VoiceOverEvents2D.SectorTakenAttacker, // attack successful. we've taken enemy sector
+                        mod.VoiceOverFlags.Golf
+                    )
+                }) */
             },
 
-            OnPlayerDied: async () => {
+            OnPlayerDied: () => {
                 this.battleStatsComp.addDeath()
 
-                await mod.Wait(0.1)
-                mod.Kill(this.player)
+                mod.Wait(0.1).then(() => {
+                    mod.Kill(this.player)
+                })
             },
 
-            OnPlayerEarnedKill: async (
+            OnPlayerEarnedKill: (
                 eventOtherPlayer,
                 eventDeathType,
                 eventWeaponUnlock
@@ -2424,12 +2423,12 @@ export class Player extends CorePlayer_APlayer {
                 }
             },
 
-            OnPlayerUndeploy: () => {
-                /* mod.SetTeam(
+            /* OnPlayerUndeploy: () => {
+                mod.SetTeam(
                     this.player,
                     this.teamId === 1 ? mod.GetTeam(2) : mod.GetTeam(1)
-                ) */
-            },
+                )
+            }, */
 
             OnPlayerInteract: (eventInteractPoint) => {
                 const ids = [
@@ -2452,21 +2451,7 @@ export class Player extends CorePlayer_APlayer {
                 }
             },
 
-            OnPlayerDamaged: () => {
-                /* mod.PlaySound(
-                    mod.SpawnObject(
-                        mod.RuntimeSpawn_Common
-                            .SFX_Soldier_Damage_ArmorDamage_Enemy_OneShot2D,
-                        mod.GetObjectPosition(this.player),
-                        mod.CreateVector(0, 0, 0)
-                    ),
-                    10,
-                    mod.GetObjectPosition(this.player),
-                    100
-                ) */
-            },
-
-            OngoingPlayer: async () => {
+            OngoingPlayer: () => {
                 if (!mod.IsPlayerValid(this.player)) {
                     return
                 }
@@ -2500,8 +2485,9 @@ export class Player extends CorePlayer_APlayer {
                             mod.Gadgets.Class_Adrenaline_Injector
                         )
                     ) {
-                        await mod.Wait(1)
-                        mod.Heal(this.player, 100)
+                        mod.Wait(1).then(() => {
+                            mod.Heal(this.player, 100)
+                        })
                     }
                 }
             },
@@ -6123,16 +6109,18 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
         const captureProgressMapEntry =
             this.captureProgressMap.get(capturePointId)
 
-        if (!captureProgressMapEntry) {
-            this.captureProgressMap.set(capturePointId, {
-                captureProgress,
-                isCapturing: true,
-            })
+        const entry = captureProgressMapEntry ?? {
+            captureProgress,
+            isCapturing: true,
         }
 
-        if (captureProgress < captureProgressMapEntry!.captureProgress) {
+        if (!captureProgressMapEntry) {
+            this.captureProgressMap.set(capturePointId, entry)
+        }
+
+        if (captureProgress < entry.captureProgress) {
             // Neutralization
-            if (captureProgressMapEntry?.isCapturing) {
+            if (entry.isCapturing) {
                 mod.SetCapturePointNeutralizationTime(
                     eventCapturePoint,
                     this.CAPTURE_POINT_TIME
@@ -6145,7 +6133,7 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
             })
         } else {
             // Capturing
-            if (!captureProgressMapEntry?.isCapturing) {
+            if (!entry.isCapturing) {
                 mod.SetCapturePointCapturingTime(
                     eventCapturePoint,
                     this.CAPTURE_POINT_TIME
