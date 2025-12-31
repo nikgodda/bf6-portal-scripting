@@ -2191,6 +2191,55 @@ export abstract class CoreAI_AProfile {
 
     /** Sensor factories. Each returns a new CoreAI_ASensor instance. */
     sensors: (() => CoreAI_ASensor)[] = []
+
+    protected addSensorIf(
+        condition: unknown,
+        factory: () => CoreAI_ASensor
+    ): void {
+        if (condition) {
+            this.sensors.push(factory)
+        }
+    }
+}
+
+export interface CoreAI_FightSensorOptions {
+    intervalMs?: number
+    ttlMs?: number
+}
+
+export interface CoreAI_ClosestEnemySensorOptions {
+    sensitivity?: number
+    intervalMs?: number
+    ttlMs?: number
+}
+
+export interface CoreAI_ArrivalSensorOptions {
+    getWPs?: () => mod.Vector[]
+    intervalMs?: number
+    distanceThreshold?: number
+    ttlMs?: number
+    cooldownMs?: number
+}
+
+export interface CoreAI_MoveToSensorOptions {
+    getWPs?: () => mod.Vector[]
+    intervalMs?: number
+    ttlMs?: number
+}
+
+export interface CoreAI_CapturePointSensorOptions {
+    getCapturePoints?: () => mod.CapturePoint[]
+    intervalMs?: number
+    ttlMs?: number
+}
+
+export interface CoreAI_SensorOptions {
+    fightSensor?: CoreAI_FightSensorOptions
+    closestEnemySensor?: CoreAI_ClosestEnemySensorOptions
+    arrivalSensor?: CoreAI_ArrivalSensorOptions
+    onfootMoveToSensor?: CoreAI_MoveToSensorOptions
+    driverMoveToSensor?: CoreAI_MoveToSensorOptions
+    moveToCapturePointSensor?: CoreAI_CapturePointSensorOptions
 }
 
 // -------- FILE: src\Core\AI\Modules\Task\TaskSelector.ts --------
@@ -2598,8 +2647,8 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
         const enemyPos = mod.GetObjectPosition(enemy)
         const hitDist = mod.DistanceBetween(eventPoint, enemyPos)
 
-        // TODO find best value
-        if (hitDist > 1.0) return
+        const maxHitDist = 1.5
+        if (hitDist > maxHitDist) return
 
         ctx.memory.set('isInBattle', true, this.ttlMs)
     }
@@ -3630,43 +3679,11 @@ export class CoreAI_DriverMoveToSensor extends CoreAI_ASensor {
     }
 }
 
-// -------- FILE: src\Core\AI\Profiles\CombatantProfile.ts --------
-export interface CoreAI_CombatantProfileOptions {
-    fightSensor?: {
-        intervalMs?: number
-        ttlMs?: number
-    }
-    closestEnemySensor?: {
-        sensitivity?: number
-        intervalMs?: number
-        ttlMs?: number
-    }
-    arrivalSensor?: {
-        getWPs?: () => mod.Vector[]
-        intervalMs?: number
-        distanceThreshold?: number
-        ttlMs?: number
-        cooldownMs?: number
-    }
-    onfootMoveToSensor?: {
-        getWPs?: () => mod.Vector[]
-        intervalMs?: number
-        ttlMs?: number
-    }
-    driverMoveToSensor?: {
-        getWPs?: () => mod.Vector[]
-        intervalMs?: number
-        ttlMs?: number
-    }
-    moveToCapturePointSensor?: {
-        getCapturePoints?: () => mod.CapturePoint[]
-        intervalMs?: number
-        ttlMs?: number
-    }
-}
+// -------- FILE: src\Core\AI\Profiles\BaseProfile.ts --------
+export type CoreAI_BaseProfileOptions = CoreAI_SensorOptions
 
-export class CoreAI_CombatantProfile extends CoreAI_AProfile {
-    constructor(options: CoreAI_CombatantProfileOptions = {}) {
+export class CoreAI_BaseProfile extends CoreAI_AProfile {
+    constructor(options: CoreAI_BaseProfileOptions = {}) {
         super()
 
         const getMoveMode = (brain: { player: mod.Player }) => {
@@ -3735,67 +3752,67 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
             },
         ] as CoreAI_ITaskScoringEntry[]
 
-        this.sensors = [
+        this.addSensorIf(options.fightSensor, () =>
+            new CoreAI_FightSensor(
+                options.fightSensor?.intervalMs,
+                options.fightSensor?.ttlMs
+            )
+        )
+
+        this.addSensorIf(options.closestEnemySensor, () =>
+            new CoreAI_ClosestEnemySensor(
+                options.closestEnemySensor?.sensitivity,
+                options.closestEnemySensor?.intervalMs,
+                options.closestEnemySensor?.ttlMs
+            )
+        )
+
+        this.addSensorIf(options.arrivalSensor?.getWPs, () =>
+            new CoreAI_ArrivalSensor(
+                () => options.arrivalSensor!.getWPs!(),
+                options.arrivalSensor?.intervalMs,
+                options.arrivalSensor?.distanceThreshold,
+                options.arrivalSensor?.ttlMs,
+                options.arrivalSensor?.cooldownMs
+            )
+        )
+
+        this.addSensorIf(
+            options.moveToCapturePointSensor?.getCapturePoints,
             () =>
-                new CoreAI_FightSensor(
-                    options.fightSensor?.intervalMs,
-                    options.fightSensor?.ttlMs
-                ),
-            () =>
-                new CoreAI_ClosestEnemySensor(
-                    options.closestEnemySensor?.sensitivity,
-                    options.closestEnemySensor?.intervalMs,
-                    options.closestEnemySensor?.ttlMs
-                ),
-        ]
+                new CoreAI_CapturePointMoveToSensor(
+                    () =>
+                        options.moveToCapturePointSensor!
+                            .getCapturePoints!(),
+                    options.moveToCapturePointSensor?.intervalMs,
+                    options.moveToCapturePointSensor?.ttlMs
+                )
+        )
 
-        if (options.arrivalSensor?.getWPs) {
-            this.sensors.push(
-                () =>
-                    new CoreAI_ArrivalSensor(
-                        () => options.arrivalSensor!.getWPs!(),
-                        options.arrivalSensor?.intervalMs,
-                        options.arrivalSensor?.distanceThreshold,
-                        options.arrivalSensor?.ttlMs,
-                        options.arrivalSensor?.cooldownMs
-                    )
+        this.addSensorIf(options.onfootMoveToSensor?.getWPs, () =>
+            new CoreAI_OnfootMoveToSensor(
+                () => options.onfootMoveToSensor!.getWPs!(),
+                options.onfootMoveToSensor?.intervalMs,
+                options.onfootMoveToSensor?.ttlMs
             )
-        }
+        )
 
-        if (options.moveToCapturePointSensor?.getCapturePoints) {
-            this.sensors.push(
-                () =>
-                    new CoreAI_CapturePointMoveToSensor(
-                        () =>
-                            options.moveToCapturePointSensor!
-                                .getCapturePoints!(),
-                        options.moveToCapturePointSensor?.intervalMs,
-                        options.moveToCapturePointSensor?.ttlMs
-                    )
+        this.addSensorIf(options.driverMoveToSensor?.getWPs, () =>
+            new CoreAI_DriverMoveToSensor(
+                () => options.driverMoveToSensor!.getWPs!(),
+                options.driverMoveToSensor?.intervalMs,
+                options.driverMoveToSensor?.ttlMs
             )
-        }
+        )
+    }
+}
 
-        if (options.onfootMoveToSensor?.getWPs) {
-            this.sensors.push(
-                () =>
-                    new CoreAI_OnfootMoveToSensor(
-                        () => options.onfootMoveToSensor!.getWPs!(),
-                        options.onfootMoveToSensor?.intervalMs,
-                        options.onfootMoveToSensor?.ttlMs
-                    )
-            )
-        }
+// -------- FILE: src\Core\AI\Profiles\CombatantProfile.ts --------
+export type CoreAI_CombatantProfileOptions = CoreAI_SensorOptions
 
-        if (options.driverMoveToSensor?.getWPs) {
-            this.sensors.push(
-                () =>
-                    new CoreAI_DriverMoveToSensor(
-                        () => options.driverMoveToSensor!.getWPs!(),
-                        options.driverMoveToSensor?.intervalMs,
-                        options.driverMoveToSensor?.ttlMs
-                    )
-            )
-        }
+export class CoreAI_CombatantProfile extends CoreAI_BaseProfile {
+    constructor(options: CoreAI_CombatantProfileOptions = {}) {
+        super()
     }
 }
 
@@ -4185,7 +4202,7 @@ export class Player extends CorePlayer_APlayer {
                 // spawn protection
                 this.protectionComp.activate()
 
-                mod.AIEnableShooting(this.player, false)
+                // mod.AIEnableShooting(this.player, false)
             },
         })
     }
@@ -4294,10 +4311,8 @@ export class PG_GameMode extends Core_AGameMode {
     protected override async OnLogicalPlayerJoinGame(
         lp: CorePlayer_APlayer
     ): Promise<void> {
-        // if (2 > 1) return
-
         // Attach AI brain to logical AI players only
-        if (lp.isLogicalAI()) {
+        if (lp.isAI()) {
             /* if (lp.teamId === 1) {
                 await mod.Wait(5)
                 mod.ForcePlayerToSeat(lp.player, this.vehicle!, -1)
@@ -4306,18 +4321,11 @@ export class PG_GameMode extends Core_AGameMode {
             const brain = new CoreAI_Brain(
                 lp.player,
                 new CoreAI_CombatantProfile({
+                    fightSensor: {},
+                    closestEnemySensor: {},
                     onfootMoveToSensor: {
                         getWPs: () => this.geRangeWPs(1000, 1010),
                         ttlMs: 10000,
-                    },
-                    driverMoveToSensor: {
-                        getWPs: () => this.geRangeWPs(1100, 1107),
-                        /* [
-                            mod.GetObjectPosition(mod.GetHQ(1)),
-                            mod.GetObjectPosition(mod.GetHQ(3)),
-                            mod.GetObjectPosition(mod.GetHQ(4)),
-                        ], */
-                        ttlMs: 60000,
                     },
                     arrivalSensor: {
                         getWPs: () => [],

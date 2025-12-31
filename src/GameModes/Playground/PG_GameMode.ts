@@ -102,10 +102,8 @@ export class PG_GameMode extends Core_AGameMode {
     protected override async OnLogicalPlayerJoinGame(
         lp: CorePlayer_APlayer
     ): Promise<void> {
-        // if (2 > 1) return
-
         // Attach AI brain to logical AI players only
-        if (lp.isLogicalAI()) {
+        if (lp.isAI()) {
             /* if (lp.teamId === 1) {
                 await mod.Wait(5)
                 mod.ForcePlayerToSeat(lp.player, this.vehicle!, -1)
@@ -114,18 +112,11 @@ export class PG_GameMode extends Core_AGameMode {
             const brain = new CoreAI_Brain(
                 lp.player,
                 new CoreAI_CombatantProfile({
+                    fightSensor: {},
+                    closestEnemySensor: {},
                     onfootMoveToSensor: {
                         getWPs: () => this.geRangeWPs(1000, 1010),
                         ttlMs: 10000,
-                    },
-                    driverMoveToSensor: {
-                        getWPs: () => this.geRangeWPs(1100, 1107),
-                        /* [
-                            mod.GetObjectPosition(mod.GetHQ(1)),
-                            mod.GetObjectPosition(mod.GetHQ(3)),
-                            mod.GetObjectPosition(mod.GetHQ(4)),
-                        ], */
-                        ttlMs: 60000,
                     },
                     arrivalSensor: {
                         getWPs: () => [],

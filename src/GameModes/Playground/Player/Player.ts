@@ -16,7 +16,7 @@ export class Player extends CorePlayer_APlayer {
                 // spawn protection
                 this.protectionComp.activate()
 
-                mod.AIEnableShooting(this.player, false)
+                // mod.AIEnableShooting(this.player, false)
             },
         })
     }

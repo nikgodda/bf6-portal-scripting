@@ -20,4 +20,53 @@ export abstract class CoreAI_AProfile {
 
     /** Sensor factories. Each returns a new CoreAI_ASensor instance. */
     sensors: (() => CoreAI_ASensor)[] = []
+
+    protected addSensorIf(
+        condition: unknown,
+        factory: () => CoreAI_ASensor
+    ): void {
+        if (condition) {
+            this.sensors.push(factory)
+        }
+    }
+}
+
+export interface CoreAI_FightSensorOptions {
+    intervalMs?: number
+    ttlMs?: number
+}
+
+export interface CoreAI_ClosestEnemySensorOptions {
+    sensitivity?: number
+    intervalMs?: number
+    ttlMs?: number
+}
+
+export interface CoreAI_ArrivalSensorOptions {
+    getWPs?: () => mod.Vector[]
+    intervalMs?: number
+    distanceThreshold?: number
+    ttlMs?: number
+    cooldownMs?: number
+}
+
+export interface CoreAI_MoveToSensorOptions {
+    getWPs?: () => mod.Vector[]
+    intervalMs?: number
+    ttlMs?: number
+}
+
+export interface CoreAI_CapturePointSensorOptions {
+    getCapturePoints?: () => mod.CapturePoint[]
+    intervalMs?: number
+    ttlMs?: number
+}
+
+export interface CoreAI_SensorOptions {
+    fightSensor?: CoreAI_FightSensorOptions
+    closestEnemySensor?: CoreAI_ClosestEnemySensorOptions
+    arrivalSensor?: CoreAI_ArrivalSensorOptions
+    onfootMoveToSensor?: CoreAI_MoveToSensorOptions
+    driverMoveToSensor?: CoreAI_MoveToSensorOptions
+    moveToCapturePointSensor?: CoreAI_CapturePointSensorOptions
 }
