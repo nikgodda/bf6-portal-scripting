@@ -60,7 +60,7 @@ export class PG_GameMode extends Core_AGameMode {
                 this.playerManager.spawnLogicalBot(
                     mod.SoldierClass.Engineer,
                     1,
-                    mod.GetObjectPosition(mod.GetHQ(2)),
+                    mod.GetObjectPosition(mod.GetHQ(1)),
                     mod.Message(`core.ai.bots.${i}`),
                     this.AI_UNSPAWN_DELAY
                 )
@@ -82,18 +82,33 @@ export class PG_GameMode extends Core_AGameMode {
         /*
          *
          */
-        const vehicleSpawner = mod.SpawnObject(
-            mod.RuntimeSpawn_Common.VehicleSpawner,
-            mod.GetObjectPosition(mod.GetSpatialObject(1106)),
-            mod.CreateVector(0, 0, 0)
-        )
 
         mod.Wait(30).then(() => {
+            const vehicleSpawner = mod.SpawnObject(
+                mod.RuntimeSpawn_Common.VehicleSpawner,
+                mod.GetObjectPosition(mod.GetSpatialObject(1106)),
+                mod.CreateVector(0, 0, 0)
+            )
+
             mod.SetVehicleSpawnerVehicleType(
                 vehicleSpawner,
                 mod.VehicleList.Abrams
             )
             mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
+        })
+
+        mod.Wait(31).then(() => {
+            const vehicleSpawner1 = mod.SpawnObject(
+                mod.RuntimeSpawn_Common.VehicleSpawner,
+                mod.GetObjectPosition(mod.GetSpatialObject(1107)),
+                mod.CreateVector(0, 0, 0)
+            )
+
+            mod.SetVehicleSpawnerVehicleType(
+                vehicleSpawner1,
+                mod.VehicleList.Abrams
+            )
+            mod.ForceVehicleSpawnerSpawn(vehicleSpawner1)
         })
     }
 
@@ -102,24 +117,7 @@ export class PG_GameMode extends Core_AGameMode {
      */
 
     protected override OnVehicleSpawned(eventVehicle: mod.Vehicle): void {
-        /* if (!mod.CompareVehicleName(eventVehicle, mod.VehicleList.Marauder)) {
-            return
-        } */
-        const lp = this.playerManager.getById(2)
-        if (!lp) {
-            return
-        }
-
-        // mod.Wait(5).then(() => {
-        /* const brainComp = lp.getComponent(CoreAI_BrainComponent)
-            if (brainComp) {
-                brainComp.brain.memory.set('moveToPos', null)
-            }*/
-
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(lp.player))
-
-        // mod.ForcePlayerToSeat(lp.player, eventVehicle, 0)
-        // })
+        mod.DisplayHighlightedWorldLogMessage(mod.Message(666))
     }
 
     protected override OnPlayerEnterVehicleSeat(
@@ -141,9 +139,7 @@ export class PG_GameMode extends Core_AGameMode {
             return
         }
 
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(seat))
-
-        const profile = brainComp.brain.installProfile(this.defVehicleProfile)
+        brainComp.brain.installProfile(this.defVehicleProfile)
     }
 
     /*

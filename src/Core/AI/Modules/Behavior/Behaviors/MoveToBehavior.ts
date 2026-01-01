@@ -38,8 +38,6 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
     }
 
     override enter(): void {
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(999))
-
         const player = this.brain.player
         if (!mod.IsPlayerValid(player)) {
             return

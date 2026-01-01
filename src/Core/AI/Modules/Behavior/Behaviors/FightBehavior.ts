@@ -20,8 +20,6 @@ export class CoreAI_FightBehavior extends CoreAI_ABehavior {
     }
 
     override async enter(): Promise<void> {
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(477))
-
         const player = this.brain.player
         if (!mod.IsPlayerValid(player)) {
             return

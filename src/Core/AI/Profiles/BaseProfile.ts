@@ -49,7 +49,8 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
             },
 
             {
-                score: (brain) => (brain.memory.get('vehicleToDrive') ? 90 : 0),
+                score: (brain) =>
+                    brain.memory.get('vehicleToDrive') ? 290 : 0,
                 factory: (brain) => {
                     const vehicle = brain.memory.get('vehicleToDrive')!
                     const vPos = mod.GetVehicleState(
@@ -73,7 +74,9 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                     return new CoreAI_MoveToBehavior(
                         brain,
                         vPos,
-                        mod.MoveSpeed.Sprint,
+                        Math.random() < 0.3
+                            ? mod.MoveSpeed.Sprint
+                            : mod.MoveSpeed.Run,
                         'onFoot',
                         2.0,
                         false

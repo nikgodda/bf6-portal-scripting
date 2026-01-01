@@ -24,11 +24,8 @@ export class CoreAI_MemoryManager {
     /** All memory values live here */
     public data: CoreAI_MemoryFields = {
         closestEnemy: null,
-
         vehicleToDrive: null,
-
         isInBattle: false,
-
         moveToPos: null,
         arrivedPos: null,
     }
@@ -121,11 +118,8 @@ export class CoreAI_MemoryManager {
 
         this.data = {
             closestEnemy: null,
-
             vehicleToDrive: null,
-
             isInBattle: false,
-
             moveToPos: null,
             arrivedPos: null,
         }

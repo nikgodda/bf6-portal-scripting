@@ -1750,11 +1750,8 @@ export class CoreAI_MemoryManager {
     /** All memory values live here */
     public data: CoreAI_MemoryFields = {
         closestEnemy: null,
-
         vehicleToDrive: null,
-
         isInBattle: false,
-
         moveToPos: null,
         arrivedPos: null,
     }
@@ -1847,11 +1844,8 @@ export class CoreAI_MemoryManager {
 
         this.data = {
             closestEnemy: null,
-
             vehicleToDrive: null,
-
             isInBattle: false,
-
             moveToPos: null,
             arrivedPos: null,
         }
@@ -2929,8 +2923,6 @@ export class CoreAI_Brain {
      * ------------------------------------------------------------ */
 
     onMoveFinished(success: boolean): void {
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(454))
-
         /* this.memory.set('moveToPos', null)
         this.emit('OnMoveFinished', success) */
     }
@@ -3077,8 +3069,6 @@ export class CoreAI_FightBehavior extends CoreAI_ABehavior {
     }
 
     override async enter(): Promise<void> {
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(477))
-
         const player = this.brain.player
         if (!mod.IsPlayerValid(player)) {
             return
@@ -3290,8 +3280,6 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
     }
 
     override enter(): void {
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(999))
-
         const player = this.brain.player
         if (!mod.IsPlayerValid(player)) {
             return
@@ -4043,7 +4031,8 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
             },
 
             {
-                score: (brain) => (brain.memory.get('vehicleToDrive') ? 90 : 0),
+                score: (brain) =>
+                    brain.memory.get('vehicleToDrive') ? 290 : 0,
                 factory: (brain) => {
                     const vehicle = brain.memory.get('vehicleToDrive')!
                     const vPos = mod.GetVehicleState(
@@ -4067,7 +4056,9 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                     return new CoreAI_MoveToBehavior(
                         brain,
                         vPos,
-                        mod.MoveSpeed.Sprint,
+                        Math.random() < 0.3
+                            ? mod.MoveSpeed.Sprint
+                            : mod.MoveSpeed.Run,
                         'onFoot',
                         2.0,
                         false
@@ -4671,7 +4662,7 @@ export class PG_GameMode extends Core_AGameMode {
                 this.playerManager.spawnLogicalBot(
                     mod.SoldierClass.Engineer,
                     1,
-                    mod.GetObjectPosition(mod.GetHQ(2)),
+                    mod.GetObjectPosition(mod.GetHQ(1)),
                     mod.Message(`core.ai.bots.${i}`),
                     this.AI_UNSPAWN_DELAY
                 )
@@ -4693,18 +4684,33 @@ export class PG_GameMode extends Core_AGameMode {
         /*
          *
          */
-        const vehicleSpawner = mod.SpawnObject(
-            mod.RuntimeSpawn_Common.VehicleSpawner,
-            mod.GetObjectPosition(mod.GetSpatialObject(1106)),
-            mod.CreateVector(0, 0, 0)
-        )
 
         mod.Wait(30).then(() => {
+            const vehicleSpawner = mod.SpawnObject(
+                mod.RuntimeSpawn_Common.VehicleSpawner,
+                mod.GetObjectPosition(mod.GetSpatialObject(1106)),
+                mod.CreateVector(0, 0, 0)
+            )
+
             mod.SetVehicleSpawnerVehicleType(
                 vehicleSpawner,
                 mod.VehicleList.Abrams
             )
             mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
+        })
+
+        mod.Wait(31).then(() => {
+            const vehicleSpawner1 = mod.SpawnObject(
+                mod.RuntimeSpawn_Common.VehicleSpawner,
+                mod.GetObjectPosition(mod.GetSpatialObject(1107)),
+                mod.CreateVector(0, 0, 0)
+            )
+
+            mod.SetVehicleSpawnerVehicleType(
+                vehicleSpawner1,
+                mod.VehicleList.Abrams
+            )
+            mod.ForceVehicleSpawnerSpawn(vehicleSpawner1)
         })
     }
 
@@ -4713,24 +4719,7 @@ export class PG_GameMode extends Core_AGameMode {
      */
 
     protected override OnVehicleSpawned(eventVehicle: mod.Vehicle): void {
-        /* if (!mod.CompareVehicleName(eventVehicle, mod.VehicleList.Marauder)) {
-            return
-        } */
-        const lp = this.playerManager.getById(2)
-        if (!lp) {
-            return
-        }
-
-        // mod.Wait(5).then(() => {
-        /* const brainComp = lp.getComponent(CoreAI_BrainComponent)
-            if (brainComp) {
-                brainComp.brain.memory.set('moveToPos', null)
-            }*/
-
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(lp.player))
-
-        // mod.ForcePlayerToSeat(lp.player, eventVehicle, 0)
-        // })
+        mod.DisplayHighlightedWorldLogMessage(mod.Message(666))
     }
 
     protected override OnPlayerEnterVehicleSeat(
@@ -4752,9 +4741,7 @@ export class PG_GameMode extends Core_AGameMode {
             return
         }
 
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(seat))
-
-        const profile = brainComp.brain.installProfile(this.defVehicleProfile)
+        brainComp.brain.installProfile(this.defVehicleProfile)
     }
 
     /*
