@@ -3,10 +3,12 @@ import { CoreAI_ITaskScoringEntry } from '../Modules/Task/ITaskScoringEntry'
 
 import { CoreAI_FightBehavior } from '../Modules/Behavior/Behaviors/FightBehavior'
 import { CoreAI_DefendBehavior } from '../Modules/Behavior/Behaviors/DefendBehavior'
+import { CoreAI_EnterVehicleBehavior } from '../Modules/Behavior/Behaviors/EnterVehicleBehavior'
 import { CoreAI_MoveToBehavior } from '../Modules/Behavior/Behaviors/MoveToBehavior'
 
 import { CoreAI_FightSensor } from '../Modules/Perception/Sensors/FightSensor'
 import { CoreAI_ClosestEnemySensor } from '../Modules/Perception/Sensors/MoveTo/ClosestEnemySensor'
+import { CoreAI_VehicleToDriveSensor } from '../Modules/Perception/Sensors/Vehicle/VehicleToDriveSensor'
 import { CoreAI_ArrivalSensor } from '../Modules/Perception/Sensors/ArrivalSensor'
 import { CoreAI_OnFootMoveToSensor } from '../Modules/Perception/Sensors/MoveTo/OnFootMoveToSensor'
 import { CoreAI_CapturePointMoveToSensor } from '../Modules/Perception/Sensors/MoveTo/CapturePointMoveToSensor'
@@ -30,14 +32,72 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
 
             {
                 score: (brain) => (brain.memory.get('closestEnemy') ? 150 : 0),
-                factory: (brain) =>
-                    new CoreAI_MoveToBehavior(
+                factory: (brain) => {
+                    const enemy = brain.memory.get('closestEnemy')!
+                    const pos = mod.GetSoldierState(
+                        enemy,
+                        mod.SoldierStateVector.GetPosition
+                    )
+
+                    return new CoreAI_MoveToBehavior(
                         brain,
-                        brain.memory.get('moveToPos')!,
+                        pos,
                         mod.MoveSpeed.InvestigateRun,
                         brain.memory.get('closestEnemy'),
                         this.getMoveMode(brain)
-                    ),
+                    )
+                },
+            },
+
+            {
+                score: (brain) => {
+                    if (
+                        mod.GetSoldierState(
+                            brain.player,
+                            mod.SoldierStateBool.IsInVehicle
+                        )
+                    ) {
+                        return 0
+                    }
+                    const vehicle = brain.memory.get('vehicleToDrive')
+                    if (!vehicle) return 0
+
+                    const occupant = mod.GetPlayerFromVehicleSeat(vehicle, 0)
+                    if (mod.IsPlayerValid(occupant)) return 0
+
+                    return 90
+                },
+                factory: (brain) => {
+                    // mod.DisplayHighlightedWorldLogMessage(mod.Message(555))
+
+                    const vehicle = brain.memory.get('vehicleToDrive')!
+                    const vPos = mod.GetVehicleState(
+                        vehicle,
+                        mod.VehicleStateVector.VehiclePosition
+                    )
+                    const dist = mod.DistanceBetween(
+                        mod.GetObjectPosition(brain.player),
+                        vPos
+                    )
+
+                    if (dist <= 3.0) {
+                        return new CoreAI_EnterVehicleBehavior(
+                            brain,
+                            vehicle,
+                            0,
+                            3.0
+                        )
+                    }
+
+                    return new CoreAI_MoveToBehavior(
+                        brain,
+                        vPos,
+                        mod.MoveSpeed.Sprint,
+                        null,
+                        'onFoot',
+                        2.0
+                    )
+                },
             },
 
             {
@@ -53,20 +113,30 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
 
             {
                 score: (brain) => (brain.memory.get('moveToPos') ? 20 : 0),
-                factory: (brain) =>
-                    new CoreAI_MoveToBehavior(
+                factory: (brain) => {
+                    const mode = this.getMoveMode(brain)
+
+                    return new CoreAI_MoveToBehavior(
                         brain,
                         brain.memory.get('moveToPos')!,
                         Math.random() < 0.3
                             ? mod.MoveSpeed.Sprint
                             : mod.MoveSpeed.Run,
                         null,
-                        this.getMoveMode(brain)
-                    ),
+                        mode,
+                        mode === 'onFoot' ? 3.0 : 6.0
+                    )
+                },
             },
         ] as CoreAI_ITaskScoringEntry[]
+
         this.buildSensors(options)
     }
+
+    /**
+     *
+     */
+
     protected getMoveMode(brain: { player: mod.Player }): 'onFoot' | 'onDrive' {
         const player = brain.player
         if (!mod.IsPlayerValid(player)) return 'onFoot'
@@ -108,6 +178,16 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                     options.closestEnemySensor?.sensitivity,
                     options.closestEnemySensor?.intervalMs,
                     options.closestEnemySensor?.ttlMs
+                )
+        )
+
+        this.addSensorIf(
+            options.vehicleToDriveSensor,
+            () =>
+                new CoreAI_VehicleToDriveSensor(
+                    options.vehicleToDriveSensor?.radius,
+                    options.vehicleToDriveSensor?.intervalMs,
+                    options.vehicleToDriveSensor?.ttlMs
                 )
         )
 

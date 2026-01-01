@@ -42,6 +42,12 @@ export interface CoreAI_ClosestEnemySensorOptions {
     ttlMs?: number
 }
 
+export interface CoreAI_VehicleToDriveSensorOptions {
+    intervalMs?: number
+    radius?: number
+    ttlMs?: number
+}
+
 export interface CoreAI_ArrivalSensorOptions {
     getWPs?: () => mod.Vector[]
     intervalMs?: number
@@ -65,6 +71,7 @@ export interface CoreAI_CapturePointSensorOptions {
 export interface CoreAI_SensorOptions {
     fightSensor?: CoreAI_FightSensorOptions
     closestEnemySensor?: CoreAI_ClosestEnemySensorOptions
+    vehicleToDriveSensor?: CoreAI_VehicleToDriveSensorOptions
     arrivalSensor?: CoreAI_ArrivalSensorOptions
     onFootMoveToSensor?: CoreAI_MoveToSensorOptions
     onDriveMoveToSensor?: CoreAI_MoveToSensorOptions

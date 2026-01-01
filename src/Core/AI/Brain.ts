@@ -112,6 +112,10 @@ export class CoreAI_Brain {
         this.perception.reset()
         this.memory.reset()
         this.behaviorController.resetAll()
+
+        if (mod.IsPlayerValid(this.player)) {
+            mod.AISetTarget(this.player)
+        }
     }
 
     onUndeploy(): void {}
@@ -123,8 +127,8 @@ export class CoreAI_Brain {
     onMoveFinished(success: boolean): void {
         mod.DisplayHighlightedWorldLogMessage(mod.Message(454))
 
-        this.memory.set('moveToPos', null)
-        this.emit('OnMoveFinished', success)
+        /* this.memory.set('moveToPos', null)
+        this.emit('OnMoveFinished', success) */
     }
 
     /* ------------------------------------------------------------
@@ -185,6 +189,13 @@ export class CoreAI_Brain {
             !mod.GetSoldierState(this.player, mod.SoldierStateBool.IsAlive)
         ) {
             return
+        }
+
+        const enemy = this.memory.get('closestEnemy')
+        if (enemy && mod.IsPlayerValid(enemy)) {
+            mod.AISetTarget(this.player, enemy)
+        } else {
+            mod.AISetTarget(this.player)
         }
 
         const sensorCtx: CoreAI_SensorContext = {

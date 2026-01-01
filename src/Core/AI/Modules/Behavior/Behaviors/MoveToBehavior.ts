@@ -19,33 +19,30 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
     private readonly speed: mod.MoveSpeed
     private readonly target: mod.Player | null
     private readonly mode: CoreAI_BehaviorMode
+    private readonly arrivalDist: number
 
     constructor(
         brain: CoreAI_Brain,
         pos: mod.Vector,
-        speed: mod.MoveSpeed,
+        speed: mod.MoveSpeed = mod.MoveSpeed.Run,
         target: mod.Player | null = null,
-        mode: CoreAI_BehaviorMode = 'onFoot'
+        mode: CoreAI_BehaviorMode = 'onFoot',
+        arrivalDist: number = 3
     ) {
         super(brain)
         this.targetPos = pos
         this.speed = speed
         this.target = target
         this.mode = mode
+        this.arrivalDist = arrivalDist
     }
 
     override enter(): void {
-        // mod.DisplayHighlightedWorldLogMessage(mod.Message(999))
+        mod.DisplayHighlightedWorldLogMessage(mod.Message(999))
 
         const player = this.brain.player
         if (!mod.IsPlayerValid(player)) {
             return
-        }
-
-        if (this.target && mod.IsPlayerValid(this.target)) {
-            mod.AISetTarget(player, this.target)
-        } else {
-            mod.AISetTarget(player)
         }
 
         if (this.mode === 'onDrive') {
@@ -71,7 +68,8 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
 
     private enterOnFootMove(player: mod.Player): void {
         mod.AISetMoveSpeed(player, this.speed)
-        mod.AIValidatedMoveToBehavior(player, this.targetPos)
+        mod.AIMoveToBehavior(player, this.targetPos)
+        // mod.AIValidatedMoveToBehavior(player, this.targetPos)
     }
 
     override update(): void {
@@ -83,7 +81,7 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
 
         const myPos = mod.GetObjectPosition(player)
         const dist = mod.DistanceBetween(myPos, this.targetPos)
-        const arrivalDist = this.mode === 'onDrive' ? 10.0 : 3.0
+        const arrivalDist = this.arrivalDist
 
         if (dist < arrivalDist) {
             this.brain.memory.set('moveToPos', null)
@@ -91,8 +89,6 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
     }
 
     override exit(): void {
-        if (this.target && mod.IsPlayerValid(this.brain.player)) {
-            mod.AISetTarget(this.brain.player)
-        }
+        // No target cleanup here; targeting is managed by the brain.
     }
 }

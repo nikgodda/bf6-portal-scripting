@@ -15,17 +15,20 @@ export class PG_GameMode extends Core_AGameMode {
 
     private AI_UNSPAWN_DELAY = 10
     private AI_COUNT_TEAM_1 = 1
-    private AI_COUNT_TEAM_2 = 1
+    private AI_COUNT_TEAM_2 = 0
 
     private squadManager: Core_SquadManager | null = null
 
     private defInfantryProfile: CoreAI_BaseProfile =
         new CoreAI_CombatantProfile({
             fightSensor: {},
-            closestEnemySensor: {},
-            onFootMoveToSensor: {
+            /* closestEnemySensor: {}, */
+            /* onFootMoveToSensor: {
                 getWPs: () => this.geRangeWPs(1000, 1010),
                 ttlMs: 10000,
+            }, */
+            vehicleToDriveSensor: {
+                radius: 200,
             },
         })
 
@@ -56,7 +59,7 @@ export class PG_GameMode extends Core_AGameMode {
                 this.playerManager.spawnLogicalBot(
                     mod.SoldierClass.Engineer,
                     1,
-                    mod.GetObjectPosition(mod.GetHQ(1)),
+                    mod.GetObjectPosition(mod.GetHQ(2)),
                     mod.Message(`core.ai.bots.${i}`),
                     this.AI_UNSPAWN_DELAY
                 )
@@ -84,7 +87,7 @@ export class PG_GameMode extends Core_AGameMode {
             mod.CreateVector(0, 0, 0)
         )
 
-        mod.Wait(5).then(() => {
+        mod.Wait(18).then(() => {
             mod.SetVehicleSpawnerVehicleType(
                 vehicleSpawner,
                 mod.VehicleList.Abrams
@@ -114,7 +117,7 @@ export class PG_GameMode extends Core_AGameMode {
 
         mod.DisplayHighlightedWorldLogMessage(mod.Message(lp.player))
 
-        mod.ForcePlayerToSeat(lp.player, eventVehicle, 0)
+        // mod.ForcePlayerToSeat(lp.player, eventVehicle, 0)
         // })
     }
 

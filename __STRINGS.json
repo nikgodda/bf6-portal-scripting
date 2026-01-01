@@ -14,7 +14,7 @@
           "distance": "dis: {} | tea: {}",
           "memory": {
             "battle": "bat: {} | ene: {}",
-            "calm": "mov: {} | arr: {}"
+            "calm": "arr: {} | dri: {}"
           }
         }
       },

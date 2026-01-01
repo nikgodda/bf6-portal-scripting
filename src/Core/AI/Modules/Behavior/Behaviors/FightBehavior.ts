@@ -42,7 +42,7 @@ export class CoreAI_FightBehavior extends CoreAI_ABehavior {
                 0,
                 10
             ) */
-        mod.AIBattlefieldBehavior(player)
+            mod.AIBattlefieldBehavior(player)
             return
         }
 

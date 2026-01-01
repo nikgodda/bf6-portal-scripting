@@ -57,6 +57,5 @@ export class CoreAI_ClosestEnemySensor extends CoreAI_ASensor {
 
         // Write memory with TTL
         ctx.memory.set('closestEnemy', newEnemy, this.ttlMs)
-        ctx.memory.set('moveToPos', enemyPos, this.ttlMs)
     }
 }

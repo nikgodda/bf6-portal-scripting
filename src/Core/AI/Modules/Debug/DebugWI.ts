@@ -12,7 +12,8 @@ export class CoreAI_DebugWI {
     private battle: CoreAI_IDebugWI
     private calm: CoreAI_IDebugWI
 
-    private moveTo: mod.WorldIcon
+    private moveTo_wi: mod.WorldIcon
+    private vehicleToDrive_wi: mod.WorldIcon
 
     constructor(private player: mod.Player, private brain: CoreAI_Brain) {
         this.calm = { index: 3, worldIcon: this.spawnWI(player) }
@@ -20,27 +21,68 @@ export class CoreAI_DebugWI {
         this.stats = { index: 1, worldIcon: this.spawnWI(player) }
         this.behavior = { index: 0, worldIcon: this.spawnWI(player) }
 
-        this.moveTo = mod.SpawnObject(
+        this.moveTo_wi = mod.SpawnObject(
             mod.RuntimeSpawn_Common.WorldIcon,
             mod.CreateVector(0, 0, 0),
             mod.CreateVector(0, 0, 0)
         )
-        mod.SetWorldIconOwner(this.moveTo, player)
-        mod.SetWorldIconImage(this.moveTo, mod.WorldIconImages.Skull)
-        mod.EnableWorldIconImage(this.moveTo, true)
-        mod.SetWorldIconColor(this.moveTo, CoreUI_Colors.YellowDark)
+        mod.SetWorldIconOwner(this.moveTo_wi, player)
+        mod.SetWorldIconImage(this.moveTo_wi, mod.WorldIconImages.Skull)
+        mod.EnableWorldIconImage(this.moveTo_wi, true)
+        mod.SetWorldIconColor(this.moveTo_wi, CoreUI_Colors.YellowDark)
+
+        this.vehicleToDrive_wi = mod.SpawnObject(
+            mod.RuntimeSpawn_Common.WorldIcon,
+            mod.CreateVector(0, 0, 0),
+            mod.CreateVector(0, 0, 0)
+        )
+        mod.SetWorldIconOwner(this.vehicleToDrive_wi, player)
+        mod.SetWorldIconImage(this.vehicleToDrive_wi, mod.WorldIconImages.Bomb)
+        mod.EnableWorldIconImage(this.vehicleToDrive_wi, true)
+        mod.SetWorldIconColor(this.vehicleToDrive_wi, CoreUI_Colors.BlueDark)
     }
 
     update() {
         if (this.brain.memory.get('moveToPos')) {
             mod.SetWorldIconPosition(
-                this.moveTo,
+                this.moveTo_wi,
                 this.brain.memory.get('moveToPos')!
             )
-            mod.EnableWorldIconImage(this.moveTo, true)
+            mod.EnableWorldIconImage(this.moveTo_wi, true)
+            mod.SetWorldIconText(
+                this.moveTo_wi,
+                mod.Message(this.brain.memory.getTimeRemaining('moveToPos'))
+            )
+            mod.EnableWorldIconText(this.moveTo_wi, true)
         } else {
-            mod.EnableWorldIconImage(this.moveTo, false)
+            mod.EnableWorldIconImage(this.moveTo_wi, false)
+            mod.EnableWorldIconText(this.moveTo_wi, false)
         }
+
+        if (this.brain.memory.get('vehicleToDrive')) {
+            mod.SetWorldIconPosition(
+                this.vehicleToDrive_wi,
+                mod.GetVehicleState(
+                    this.brain.memory.get('vehicleToDrive')!,
+                    mod.VehicleStateVector.VehiclePosition
+                )
+            )
+            mod.EnableWorldIconImage(this.vehicleToDrive_wi, true)
+            mod.SetWorldIconText(
+                this.vehicleToDrive_wi,
+                mod.Message(
+                    this.brain.memory.getTimeRemaining('vehicleToDrive')
+                )
+            )
+            mod.EnableWorldIconText(this.vehicleToDrive_wi, true)
+        } else {
+            mod.EnableWorldIconImage(this.vehicleToDrive_wi, false)
+            mod.EnableWorldIconText(this.vehicleToDrive_wi, false)
+        }
+
+        /**
+         *
+         */
 
         if (
             !mod.IsPlayerValid(this.brain.player) ||
@@ -139,8 +181,8 @@ export class CoreAI_DebugWI {
             this.calm,
             mod.Message(
                 `core.ai.debug.brain.memory.calm`,
-                this.brain.memory.getTimeRemaining('moveToPos'),
-                this.brain.memory.getTimeRemaining('arrivedPos')
+                this.brain.memory.getTimeRemaining('arrivedPos'),
+                this.brain.memory.getTimeRemaining('vehicleToDrive')
             )
         )
     }

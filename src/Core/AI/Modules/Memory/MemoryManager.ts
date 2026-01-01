@@ -9,6 +9,8 @@
 export type CoreAI_MemoryFields = {
     closestEnemy: mod.Player | null
 
+    vehicleToDrive: mod.Vehicle | null
+
     isInBattle: boolean
 
     moveToPos: mod.Vector | null // movement target
@@ -22,6 +24,8 @@ export class CoreAI_MemoryManager {
     /** All memory values live here */
     public data: CoreAI_MemoryFields = {
         closestEnemy: null,
+
+        vehicleToDrive: null,
 
         isInBattle: false,
 
@@ -117,6 +121,8 @@ export class CoreAI_MemoryManager {
 
         this.data = {
             closestEnemy: null,
+
+            vehicleToDrive: null,
 
             isInBattle: false,
 
