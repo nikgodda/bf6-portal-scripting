@@ -43,7 +43,6 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                         brain,
                         pos,
                         mod.MoveSpeed.InvestigateRun,
-                        brain.memory.get('closestEnemy'),
                         this.getMoveMode(brain)
                     )
                 },
@@ -51,6 +50,9 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
 
             {
                 score: (brain) => {
+                    const vehicle = brain.memory.get('vehicleToDrive')
+                    if (!vehicle) return 0
+
                     if (
                         mod.GetSoldierState(
                             brain.player,
@@ -59,8 +61,6 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                     ) {
                         return 0
                     }
-                    const vehicle = brain.memory.get('vehicleToDrive')
-                    if (!vehicle) return 0
 
                     const occupant = mod.GetPlayerFromVehicleSeat(vehicle, 0)
                     if (mod.IsPlayerValid(occupant)) return 0
@@ -93,9 +93,9 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                         brain,
                         vPos,
                         mod.MoveSpeed.Sprint,
-                        null,
                         'onFoot',
-                        2.0
+                        2.0,
+                        false
                     )
                 },
             },
@@ -122,7 +122,6 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                         Math.random() < 0.3
                             ? mod.MoveSpeed.Sprint
                             : mod.MoveSpeed.Run,
-                        null,
                         mode,
                         mode === 'onFoot' ? 3.0 : 6.0
                     )

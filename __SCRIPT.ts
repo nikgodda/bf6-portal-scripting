@@ -3250,26 +3250,26 @@ export class CoreAI_EnterVehicleBehavior extends CoreAI_ABehavior {
 export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
     public name = 'moveto'
 
-    private readonly targetPos: mod.Vector
+    private readonly moveToPos: mod.Vector
     private readonly speed: mod.MoveSpeed
-    private readonly target: mod.Player | null
     private readonly mode: CoreAI_BehaviorMode
     private readonly arrivalDist: number
+    private readonly isValidated: boolean
 
     constructor(
         brain: CoreAI_Brain,
         pos: mod.Vector,
         speed: mod.MoveSpeed = mod.MoveSpeed.Run,
-        target: mod.Player | null = null,
         mode: CoreAI_BehaviorMode = 'onFoot',
-        arrivalDist: number = 3
+        arrivalDist: number = 3,
+        isValidated: boolean = true
     ) {
         super(brain)
-        this.targetPos = pos
+        this.moveToPos = pos
         this.speed = speed
-        this.target = target
         this.mode = mode
         this.arrivalDist = arrivalDist
+        this.isValidated = isValidated
     }
 
     override enter(): void {
@@ -3297,14 +3297,15 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
         mod.ForcePlayerToSeat(player, vehicle, 0)
         mod.AISetMoveSpeed(player, mod.MoveSpeed.Sprint)
         // mod.AIBattlefieldBehavior(player)
-        mod.AIDefendPositionBehavior(player, this.targetPos, 0, 4)
+        mod.AIDefendPositionBehavior(player, this.moveToPos, 0, 4)
         // mod.AIValidatedMoveToBehavior(player, this.targetPos)
     }
 
     private enterOnFootMove(player: mod.Player): void {
         mod.AISetMoveSpeed(player, this.speed)
-        mod.AIMoveToBehavior(player, this.targetPos)
-        // mod.AIValidatedMoveToBehavior(player, this.targetPos)
+        this.isValidated
+            ? mod.AIValidatedMoveToBehavior(player, this.moveToPos)
+            : mod.AIMoveToBehavior(player, this.moveToPos)
     }
 
     override update(): void {
@@ -3315,7 +3316,7 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
         if (!memPos) return
 
         const myPos = mod.GetObjectPosition(player)
-        const dist = mod.DistanceBetween(myPos, this.targetPos)
+        const dist = mod.DistanceBetween(myPos, this.moveToPos)
         const arrivalDist = this.arrivalDist
 
         if (dist < arrivalDist) {
@@ -4004,7 +4005,6 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                         brain,
                         pos,
                         mod.MoveSpeed.InvestigateRun,
-                        brain.memory.get('closestEnemy'),
                         this.getMoveMode(brain)
                     )
                 },
@@ -4012,6 +4012,9 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
 
             {
                 score: (brain) => {
+                    const vehicle = brain.memory.get('vehicleToDrive')
+                    if (!vehicle) return 0
+
                     if (
                         mod.GetSoldierState(
                             brain.player,
@@ -4020,8 +4023,6 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                     ) {
                         return 0
                     }
-                    const vehicle = brain.memory.get('vehicleToDrive')
-                    if (!vehicle) return 0
 
                     const occupant = mod.GetPlayerFromVehicleSeat(vehicle, 0)
                     if (mod.IsPlayerValid(occupant)) return 0
@@ -4054,9 +4055,9 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                         brain,
                         vPos,
                         mod.MoveSpeed.Sprint,
-                        null,
                         'onFoot',
-                        2.0
+                        2.0,
+                        false
                     )
                 },
             },
@@ -4083,7 +4084,6 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                         Math.random() < 0.3
                             ? mod.MoveSpeed.Sprint
                             : mod.MoveSpeed.Run,
-                        null,
                         mode,
                         mode === 'onFoot' ? 3.0 : 6.0
                     )
