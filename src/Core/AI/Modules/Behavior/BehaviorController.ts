@@ -4,6 +4,8 @@ import { CoreAI_ABehavior } from './Behaviors/ABehavior'
 import { CoreAI_Brain } from '../../Brain'
 import { CoreAI_IdleBehavior } from './Behaviors/IdleBehavior'
 
+export type CoreAI_BehaviorMode = 'onFoot' | 'onDrive'
+
 /**
  * BehaviorController:
  *
@@ -16,6 +18,7 @@ import { CoreAI_IdleBehavior } from './Behaviors/IdleBehavior'
  * - Behaviors do NOT decide completion.
  * - Switching happens every tick based on scoring.
  */
+
 export class CoreAI_BehaviorController {
     private current: CoreAI_ABehavior
 

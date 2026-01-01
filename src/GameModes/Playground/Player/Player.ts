@@ -1,3 +1,4 @@
+import { CoreAI_CombatantProfile } from 'src/Core/AI/Profiles/CombatantProfile'
 import { CorePlayer_APlayer } from 'src/Core/Player/APlayer'
 import { CorePlayer_BattleStatsComponent } from 'src/Core/Player/Components/BattleStats/BattleStatsComponent'
 import { CorePlayer_ProtectionComponent } from 'src/Core/Player/Components/Protection/ProtectionComponent'
@@ -14,8 +15,9 @@ export class Player extends CorePlayer_APlayer {
         this.addListener({
             OnPlayerDeployed: () => {
                 // spawn protection
-                this.protectionComp.activate()
+                this.protectionComp.activate(5)
 
+                // mod.SetCameraTypeForPlayer(this.player, mod.Cameras.ThirdPerson)
                 // mod.AIEnableShooting(this.player, false)
             },
         })

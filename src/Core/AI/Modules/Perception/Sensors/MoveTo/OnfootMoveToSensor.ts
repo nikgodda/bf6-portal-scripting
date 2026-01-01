@@ -11,7 +11,7 @@ import { CoreAI_SensorContext } from '../SensorContext'
  * - Velocity is preferred when speed > threshold.
  * - Intent direction stabilizes steering across replans.
  */
-export class CoreAI_OnfootMoveToSensor extends CoreAI_ASensor {
+export class CoreAI_OnFootMoveToSensor extends CoreAI_ASensor {
     private readonly ttlMs: number
 
     private coldStart: boolean = true

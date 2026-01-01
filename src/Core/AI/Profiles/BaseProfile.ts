@@ -8,9 +8,9 @@ import { CoreAI_MoveToBehavior } from '../Modules/Behavior/Behaviors/MoveToBehav
 import { CoreAI_FightSensor } from '../Modules/Perception/Sensors/FightSensor'
 import { CoreAI_ClosestEnemySensor } from '../Modules/Perception/Sensors/MoveTo/ClosestEnemySensor'
 import { CoreAI_ArrivalSensor } from '../Modules/Perception/Sensors/ArrivalSensor'
-import { CoreAI_OnfootMoveToSensor } from '../Modules/Perception/Sensors/MoveTo/OnfootMoveToSensor'
+import { CoreAI_OnFootMoveToSensor } from '../Modules/Perception/Sensors/MoveTo/OnFootMoveToSensor'
 import { CoreAI_CapturePointMoveToSensor } from '../Modules/Perception/Sensors/MoveTo/CapturePointMoveToSensor'
-import { CoreAI_DriverMoveToSensor } from '../Modules/Perception/Sensors/MoveTo/DriverMoveToSensor'
+import { CoreAI_OnDriveMoveToSensor } from '../Modules/Perception/Sensors/MoveTo/OnDriveMoveToSensor'
 
 export type CoreAI_BaseProfileOptions = CoreAI_SensorOptions
 
@@ -24,7 +24,8 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                     const m = brain.memory
                     return m.get('isInBattle') ? 200 : 0
                 },
-                factory: (brain) => new CoreAI_FightBehavior(brain),
+                factory: (brain) =>
+                    new CoreAI_FightBehavior(brain, this.getMoveMode(brain)),
             },
 
             {
@@ -66,23 +67,23 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
         ] as CoreAI_ITaskScoringEntry[]
         this.buildSensors(options)
     }
-    protected getMoveMode(brain: { player: mod.Player }): 'onfoot' | 'driver' {
+    protected getMoveMode(brain: { player: mod.Player }): 'onFoot' | 'onDrive' {
         const player = brain.player
-        if (!mod.IsPlayerValid(player)) return 'onfoot'
+        if (!mod.IsPlayerValid(player)) return 'onFoot'
 
         const inVehicle = mod.GetSoldierState(
             player,
             mod.SoldierStateBool.IsInVehicle
         )
-        if (!inVehicle) return 'onfoot'
+        if (!inVehicle) return 'onFoot'
 
         const vehicle = mod.GetVehicleFromPlayer(player)
-        if (!vehicle) return 'onfoot'
+        if (!vehicle) return 'onFoot'
 
         const driver = mod.GetPlayerFromVehicleSeat(vehicle, 0)
         return mod.IsPlayerValid(driver) && mod.Equals(driver, player)
-            ? 'driver'
-            : 'onfoot'
+            ? 'onDrive'
+            : 'onFoot'
     }
 
     /**
@@ -133,22 +134,22 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
         )
 
         this.addSensorIf(
-            options.onfootMoveToSensor?.getWPs,
+            options.onFootMoveToSensor?.getWPs,
             () =>
-                new CoreAI_OnfootMoveToSensor(
-                    () => options.onfootMoveToSensor!.getWPs!(),
-                    options.onfootMoveToSensor?.intervalMs,
-                    options.onfootMoveToSensor?.ttlMs
+                new CoreAI_OnFootMoveToSensor(
+                    () => options.onFootMoveToSensor!.getWPs!(),
+                    options.onFootMoveToSensor?.intervalMs,
+                    options.onFootMoveToSensor?.ttlMs
                 )
         )
 
         this.addSensorIf(
-            options.driverMoveToSensor?.getWPs,
+            options.onDriveMoveToSensor?.getWPs,
             () =>
-                new CoreAI_DriverMoveToSensor(
-                    () => options.driverMoveToSensor!.getWPs!(),
-                    options.driverMoveToSensor?.intervalMs,
-                    options.driverMoveToSensor?.ttlMs
+                new CoreAI_OnDriveMoveToSensor(
+                    () => options.onDriveMoveToSensor!.getWPs!(),
+                    options.onDriveMoveToSensor?.intervalMs,
+                    options.onDriveMoveToSensor?.ttlMs
                 )
         )
     }

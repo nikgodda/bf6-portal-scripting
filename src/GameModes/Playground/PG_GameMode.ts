@@ -6,6 +6,7 @@ import { CoreAI_CombatantProfile } from 'src/Core/AI/Profiles/CombatantProfile'
 import { CoreAI_BrainComponent } from 'src/Core/AI/Components/BrainComponent'
 import { Core_SquadManager } from 'src/Core/Squad/SquadManager'
 import { PlayerManager } from './Player/PlayerManager'
+import { CoreAI_BaseProfile } from 'src/Core/AI/Profiles/BaseProfile'
 
 export class PG_GameMode extends Core_AGameMode {
     protected override createPlayerManager(): CorePlayer_APlayerManager {
@@ -13,10 +14,36 @@ export class PG_GameMode extends Core_AGameMode {
     }
 
     private AI_UNSPAWN_DELAY = 10
-    private AI_COUNT_TEAM_1 = 0
+    private AI_COUNT_TEAM_1 = 1
     private AI_COUNT_TEAM_2 = 1
 
     private squadManager: Core_SquadManager | null = null
+
+    private defInfantryProfile: CoreAI_BaseProfile =
+        new CoreAI_CombatantProfile({
+            fightSensor: {},
+            closestEnemySensor: {},
+            onFootMoveToSensor: {
+                getWPs: () => this.geRangeWPs(1000, 1010),
+                ttlMs: 10000,
+            },
+        })
+
+    private defVehicleProfile: CoreAI_BaseProfile = new CoreAI_CombatantProfile(
+        {
+            fightSensor: {
+                ttlMs: 20000,
+            },
+            onDriveMoveToSensor: {
+                getWPs: () => this.geRangeWPs(1106, 1108),
+                ttlMs: 60000,
+            },
+            /* arrivalSensor: {
+                getWPs: () => this.geRangeWPs(1100, 1107),
+                ttlMs: 20000,
+            }, */
+        }
+    )
 
     protected override OnGameModeStarted(): void {
         // One-time game setup (rules, scoreboard, AI bootstrap)
@@ -53,7 +80,7 @@ export class PG_GameMode extends Core_AGameMode {
          */
         const vehicleSpawner = mod.SpawnObject(
             mod.RuntimeSpawn_Common.VehicleSpawner,
-            mod.GetObjectPosition(mod.GetHQ(1)),
+            mod.GetObjectPosition(mod.GetSpatialObject(1106)),
             mod.CreateVector(0, 0, 0)
         )
 
@@ -64,8 +91,6 @@ export class PG_GameMode extends Core_AGameMode {
             )
             mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
         })
-
-        mod.GetWaypointPath
     }
 
     /*
@@ -76,24 +101,46 @@ export class PG_GameMode extends Core_AGameMode {
         /* if (!mod.CompareVehicleName(eventVehicle, mod.VehicleList.Marauder)) {
             return
         } */
-        const lp = this.playerManager.getById(1)
+        const lp = this.playerManager.getById(2)
         if (!lp) {
             return
         }
 
-        /* mod.Wait(10).then(() => {
-            const brainComp = lp.getComponent(CoreAI_BrainComponent)
+        // mod.Wait(5).then(() => {
+        /* const brainComp = lp.getComponent(CoreAI_BrainComponent)
             if (brainComp) {
                 brainComp.brain.memory.set('moveToPos', null)
-            }
-            mod.ForcePlayerToSeat(lp.player, eventVehicle, -1)
-        }) */
+            }*/
+
+        mod.DisplayHighlightedWorldLogMessage(mod.Message(lp.player))
+
+        mod.ForcePlayerToSeat(lp.player, eventVehicle, 0)
+        // })
     }
 
-    protected override OnPlayerExitVehicle(
+    protected override OnPlayerEnterVehicleSeat(
         eventPlayer: mod.Player,
-        eventVehicle: mod.Vehicle
-    ): void {}
+        eventVehicle: mod.Vehicle,
+        eventSeat: mod.Object
+    ): void {
+        const lp = this.playerManager.get(eventPlayer)
+        if (!lp) return
+
+        const brainComp = lp.getComponent(CoreAI_BrainComponent)
+        if (!brainComp) {
+            return
+        }
+
+        const seat = mod.GetPlayerVehicleSeat(eventPlayer)
+
+        if (seat !== 0) {
+            return
+        }
+
+        mod.DisplayHighlightedWorldLogMessage(mod.Message(seat))
+
+        const profile = brainComp.brain.installProfile(this.defVehicleProfile)
+    }
 
     /*
      *
@@ -111,18 +158,7 @@ export class PG_GameMode extends Core_AGameMode {
 
             const brain = new CoreAI_Brain(
                 lp.player,
-                new CoreAI_CombatantProfile({
-                    fightSensor: {},
-                    closestEnemySensor: {},
-                    onfootMoveToSensor: {
-                        getWPs: () => this.geRangeWPs(1000, 1010),
-                        ttlMs: 10000,
-                    },
-                    arrivalSensor: {
-                        getWPs: () => [],
-                        ttlMs: 4000,
-                    },
-                }),
+                this.defInfantryProfile,
                 true
             )
 

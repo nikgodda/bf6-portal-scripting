@@ -1,7 +1,6 @@
 import { CoreAI_ABehavior } from './ABehavior'
 import { CoreAI_Brain } from '../../../Brain'
-
-type CoreAI_MoveToMode = 'onfoot' | 'driver'
+import { CoreAI_BehaviorMode } from '../BehaviorController'
 
 /**
  * MoveToBehavior:
@@ -19,14 +18,14 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
     private readonly targetPos: mod.Vector
     private readonly speed: mod.MoveSpeed
     private readonly target: mod.Player | null
-    private readonly mode: CoreAI_MoveToMode
+    private readonly mode: CoreAI_BehaviorMode
 
     constructor(
         brain: CoreAI_Brain,
         pos: mod.Vector,
         speed: mod.MoveSpeed,
         target: mod.Player | null = null,
-        mode: CoreAI_MoveToMode = 'onfoot'
+        mode: CoreAI_BehaviorMode = 'onFoot'
     ) {
         super(brain)
         this.targetPos = pos
@@ -35,19 +34,13 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
         this.mode = mode
     }
 
-    override async enter(): Promise<void> {
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(999))
-
-        /* console.log(
-            mod.XComponentOf(this.targetPos),
-            ' ',
-            mod.YComponentOf(this.targetPos),
-            ' ',
-            mod.ZComponentOf(this.targetPos)
-        ) */
+    override enter(): void {
+        // mod.DisplayHighlightedWorldLogMessage(mod.Message(999))
 
         const player = this.brain.player
-        if (!mod.IsPlayerValid(player)) return
+        if (!mod.IsPlayerValid(player)) {
+            return
+        }
 
         if (this.target && mod.IsPlayerValid(this.target)) {
             mod.AISetTarget(player, this.target)
@@ -55,17 +48,16 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
             mod.AISetTarget(player)
         }
 
-        if (this.mode === 'driver') {
-            await this.enterDriverMove(player)
+        if (this.mode === 'onDrive') {
+            this.enterOnDriveMove(player)
             return
         }
 
         this.enterOnFootMove(player)
     }
 
-    private async enterDriverMove(player: mod.Player): Promise<void> {
+    private async enterOnDriveMove(player: mod.Player): Promise<void> {
         const vehicle = mod.GetVehicleFromPlayer(player)
-        if (!vehicle) return
 
         mod.ForcePlayerExitVehicle(player, vehicle)
         await mod.Wait(0)
@@ -91,7 +83,7 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
 
         const myPos = mod.GetObjectPosition(player)
         const dist = mod.DistanceBetween(myPos, this.targetPos)
-        const arrivalDist = this.mode === 'driver' ? 10.0 : 3.0
+        const arrivalDist = this.mode === 'onDrive' ? 10.0 : 3.0
 
         if (dist < arrivalDist) {
             this.brain.memory.set('moveToPos', null)
