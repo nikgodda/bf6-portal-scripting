@@ -22,7 +22,7 @@ export class CoreAI_OnFootMoveToSensor extends CoreAI_ASensor {
     constructor(
         private readonly getPoints: () => mod.Vector[],
         intervalMs: number = 750,
-        ttlMs: number = 6000
+        ttlMs: number = 2000
     ) {
         super(intervalMs)
         this.ttlMs = ttlMs

@@ -36,8 +36,9 @@ export class CoreAI_VehicleToDriveSensor extends CoreAI_ASensor {
         for (let i = 0; i < count; i++) {
             const v = mod.ValueInArray(vehicles, i) as mod.Vehicle
 
-            const driver = mod.GetPlayerFromVehicleSeat(v, 0)
-            if (mod.IsPlayerValid(driver)) continue
+            if (mod.IsVehicleSeatOccupied(v, 0)) {
+                continue
+            }
 
             const vPos = mod.GetVehicleState(
                 v,

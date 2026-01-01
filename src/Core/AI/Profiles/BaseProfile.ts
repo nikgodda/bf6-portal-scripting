@@ -49,27 +49,8 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
             },
 
             {
-                score: (brain) => {
-                    const vehicle = brain.memory.get('vehicleToDrive')
-                    if (!vehicle) return 0
-
-                    if (
-                        mod.GetSoldierState(
-                            brain.player,
-                            mod.SoldierStateBool.IsInVehicle
-                        )
-                    ) {
-                        return 0
-                    }
-
-                    const occupant = mod.GetPlayerFromVehicleSeat(vehicle, 0)
-                    if (mod.IsPlayerValid(occupant)) return 0
-
-                    return 90
-                },
+                score: (brain) => (brain.memory.get('vehicleToDrive') ? 90 : 0),
                 factory: (brain) => {
-                    // mod.DisplayHighlightedWorldLogMessage(mod.Message(555))
-
                     const vehicle = brain.memory.get('vehicleToDrive')!
                     const vPos = mod.GetVehicleState(
                         vehicle,
@@ -140,19 +121,15 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
         const player = brain.player
         if (!mod.IsPlayerValid(player)) return 'onFoot'
 
-        const inVehicle = mod.GetSoldierState(
-            player,
-            mod.SoldierStateBool.IsInVehicle
-        )
-        if (!inVehicle) return 'onFoot'
+        if (!mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle)) {
+            return 'onFoot'
+        }
 
-        const vehicle = mod.GetVehicleFromPlayer(player)
-        if (!vehicle) return 'onFoot'
+        if (mod.GetPlayerVehicleSeat(player) === 0) {
+            return 'onDrive'
+        }
 
-        const driver = mod.GetPlayerFromVehicleSeat(vehicle, 0)
-        return mod.IsPlayerValid(driver) && mod.Equals(driver, player)
-            ? 'onDrive'
-            : 'onFoot'
+        return 'onFoot'
     }
 
     /**

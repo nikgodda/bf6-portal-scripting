@@ -35,23 +35,30 @@ export class CoreAI_OnDriveMoveToSensor extends CoreAI_ASensor {
 
     protected update(ctx: CoreAI_SensorContext): void {
         const player = ctx.player
-        if (!mod.IsPlayerValid(player)) return
+        if (!mod.IsPlayerValid(player)) {
+            return
+        }
+
         if (!mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle)) {
             return
         }
 
         // Do not reselect while intent exists
-        if (ctx.memory.get('moveToPos')) return
+        if (ctx.memory.get('moveToPos')) {
+            return
+        }
 
         const points = this.getPoints()
-        if (!points || points.length === 0) return
+        if (!points || points.length === 0) {
+            return
+        }
+
+        if (mod.GetPlayerVehicleSeat(player) !== 0) {
+            return
+        }
 
         const myPos = mod.GetObjectPosition(player)
-
         const vehicle = mod.GetVehicleFromPlayer(player)
-        if (!vehicle) return
-        const driver = mod.GetPlayerFromVehicleSeat(vehicle, 0)
-        if (!mod.IsPlayerValid(driver) || !mod.Equals(driver, player)) return
 
         // ------------------------------------------------------------
         // Resolve forward direction (vehicle)

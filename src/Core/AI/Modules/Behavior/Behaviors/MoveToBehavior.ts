@@ -15,7 +15,7 @@ import { CoreAI_BehaviorMode } from '../BehaviorController'
 export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
     public name = 'moveto'
 
-    private readonly moveToPos: mod.Vector
+    private moveToPos: mod.Vector
     private readonly speed: mod.MoveSpeed
     private readonly mode: CoreAI_BehaviorMode
     private readonly arrivalDist: number
@@ -79,6 +79,13 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
 
         const memPos = this.brain.memory.get('moveToPos')
         if (!memPos) return
+
+        /* 
+        // Conflicts with other Scores
+        if (!mod.Equals(memPos, this.moveToPos)) {
+            this.moveToPos = memPos
+            this.enter()
+        } */
 
         const myPos = mod.GetObjectPosition(player)
         const dist = mod.DistanceBetween(myPos, this.moveToPos)

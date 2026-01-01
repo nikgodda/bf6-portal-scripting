@@ -6,6 +6,7 @@ import { CoreAI_ITaskScoringEntry } from './ITaskScoringEntry'
 export class CoreAI_TaskSelector {
     private brain: CoreAI_Brain
     private profile: CoreAI_AProfile
+    private currentIndex: number | null = null
 
     constructor(brain: CoreAI_Brain, profile: CoreAI_AProfile) {
         this.brain = brain
@@ -21,21 +22,26 @@ export class CoreAI_TaskSelector {
 
         let bestEntry: CoreAI_ITaskScoringEntry | null = null
         let bestScore = -Infinity
+        let bestIndex: number | null = null
 
         // Evaluate profile scoring
-        for (const entry of this.profile.scoring) {
+        for (let i = 0; i < this.profile.scoring.length; i++) {
+            const entry = this.profile.scoring[i]
             const score = entry.score(this.brain)
             if (score > bestScore) {
                 bestScore = score
                 bestEntry = entry
+                bestIndex = i
             }
         }
 
         // If nothing scores above zero -> idle
         if (!bestEntry || bestScore <= 0) {
             if (current instanceof CoreAI_IdleBehavior) {
+                this.currentIndex = null
                 return current
             }
+            this.currentIndex = null
             return new CoreAI_IdleBehavior(this.brain)
         }
 
@@ -44,11 +50,17 @@ export class CoreAI_TaskSelector {
         const nextClass = temp.constructor
 
         // If same class -> never switch (no restarts)
-        if (current && current.constructor === nextClass) {
+        if (
+            current &&
+            current.constructor === nextClass &&
+            bestIndex !== null &&
+            bestIndex === this.currentIndex
+        ) {
             return current
         }
 
-        // Switch to new class
-        return bestEntry.factory(this.brain)
+        // Switch to new instance
+        this.currentIndex = bestIndex
+        return temp
     }
 }

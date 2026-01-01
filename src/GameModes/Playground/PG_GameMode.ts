@@ -15,7 +15,7 @@ export class PG_GameMode extends Core_AGameMode {
 
     private AI_UNSPAWN_DELAY = 10
     private AI_COUNT_TEAM_1 = 1
-    private AI_COUNT_TEAM_2 = 0
+    private AI_COUNT_TEAM_2 = 2
 
     private squadManager: Core_SquadManager | null = null
 
@@ -23,10 +23,11 @@ export class PG_GameMode extends Core_AGameMode {
         new CoreAI_CombatantProfile({
             fightSensor: {},
             /* closestEnemySensor: {}, */
-            /* onFootMoveToSensor: {
+            onFootMoveToSensor: {
                 getWPs: () => this.geRangeWPs(1000, 1010),
-                ttlMs: 10000,
-            }, */
+                // getWPs: () => this.geRangeWPs(1000, 1010),
+                ttlMs: 4000,
+            },
             vehicleToDriveSensor: {
                 radius: 200,
             },
@@ -35,7 +36,7 @@ export class PG_GameMode extends Core_AGameMode {
     private defVehicleProfile: CoreAI_BaseProfile = new CoreAI_CombatantProfile(
         {
             fightSensor: {
-                ttlMs: 20000,
+                ttlMs: 10000,
             },
             onDriveMoveToSensor: {
                 getWPs: () => this.geRangeWPs(1106, 1108),
@@ -87,7 +88,7 @@ export class PG_GameMode extends Core_AGameMode {
             mod.CreateVector(0, 0, 0)
         )
 
-        mod.Wait(18).then(() => {
+        mod.Wait(30).then(() => {
             mod.SetVehicleSpawnerVehicleType(
                 vehicleSpawner,
                 mod.VehicleList.Abrams

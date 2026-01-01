@@ -30,6 +30,10 @@ export class CoreAI_EnterVehicleBehavior extends CoreAI_ABehavior {
         const player = this.brain.player
         if (!mod.IsPlayerValid(player)) return
 
+        if (mod.IsVehicleSeatOccupied(this.vehicle, 0)) {
+            return
+        }
+
         mod.ForcePlayerToSeat(player, this.vehicle, this.seatIndex)
 
         this.brain.memory.set('vehicleToDrive', null)
@@ -61,6 +65,7 @@ export class CoreAI_EnterVehicleBehavior extends CoreAI_ABehavior {
             return
         }
 
+        console.log(4)
         const occupant = mod.GetPlayerFromVehicleSeat(
             this.vehicle,
             this.seatIndex
