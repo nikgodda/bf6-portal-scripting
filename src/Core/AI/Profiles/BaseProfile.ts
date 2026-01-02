@@ -7,12 +7,11 @@ import { CoreAI_EnterVehicleBehavior } from '../Modules/Behavior/Behaviors/Enter
 import { CoreAI_MoveToBehavior } from '../Modules/Behavior/Behaviors/MoveToBehavior'
 
 import { CoreAI_FightSensor } from '../Modules/Perception/Sensors/FightSensor'
-import { CoreAI_ClosestEnemySensor } from '../Modules/Perception/Sensors/MoveTo/ClosestEnemySensor'
-import { CoreAI_VehicleToDriveSensor } from '../Modules/Perception/Sensors/Vehicle/VehicleToDriveSensor'
+import { CoreAI_ClosestEnemySensor } from '../Modules/Perception/Sensors/ClosestEnemySensor'
+import { CoreAI_VehicleToDriveSensor } from '../Modules/Perception/Sensors/VehicleToDriveSensor'
 import { CoreAI_ArrivalSensor } from '../Modules/Perception/Sensors/ArrivalSensor'
-import { CoreAI_OnFootMoveToSensor } from '../Modules/Perception/Sensors/MoveTo/OnFootMoveToSensor'
-import { CoreAI_CapturePointMoveToSensor } from '../Modules/Perception/Sensors/MoveTo/CapturePointMoveToSensor'
-import { CoreAI_OnDriveMoveToSensor } from '../Modules/Perception/Sensors/MoveTo/OnDriveMoveToSensor'
+import { CoreAI_RoamSensor } from '../Modules/Perception/Sensors/RoamSensor'
+import { CoreAI_CapturePointMoveToSensor } from '../Modules/Perception/Sensors/CapturePointMoveToSensor'
 
 export type CoreAI_BaseProfileOptions = CoreAI_SensorOptions
 
@@ -96,13 +95,13 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
             },
 
             {
-                score: (brain) => (brain.memory.get('moveToPos') ? 20 : 0),
+                score: (brain) => (brain.memory.get('roamPos') ? 20 : 0),
                 factory: (brain) => {
                     const mode = this.getMoveMode(brain)
 
                     return new CoreAI_MoveToBehavior(
                         brain,
-                        brain.memory.get('moveToPos')!,
+                        brain.memory.get('roamPos')!,
                         Math.random() < 0.3
                             ? mod.MoveSpeed.Sprint
                             : mod.MoveSpeed.Run,
@@ -193,22 +192,12 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
         )
 
         this.addSensorIf(
-            options.onFootMoveToSensor?.getWPs,
+            options.RoamSensor?.getWPs,
             () =>
-                new CoreAI_OnFootMoveToSensor(
-                    () => options.onFootMoveToSensor!.getWPs!(),
-                    options.onFootMoveToSensor?.intervalMs,
-                    options.onFootMoveToSensor?.ttlMs
-                )
-        )
-
-        this.addSensorIf(
-            options.onDriveMoveToSensor?.getWPs,
-            () =>
-                new CoreAI_OnDriveMoveToSensor(
-                    () => options.onDriveMoveToSensor!.getWPs!(),
-                    options.onDriveMoveToSensor?.intervalMs,
-                    options.onDriveMoveToSensor?.ttlMs
+                new CoreAI_RoamSensor(
+                    () => options.RoamSensor!.getWPs!(),
+                    options.RoamSensor?.intervalMs,
+                    options.RoamSensor?.ttlMs
                 )
         )
     }

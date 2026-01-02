@@ -13,8 +13,11 @@
           },
           "distance": "dis: {} | tea: {}",
           "memory": {
-            "battle": "bat: {} | ene: {}",
-            "calm": "arr: {} | dri: {}"
+            "closestEnemy": "closestEnemy: {}",
+            "vehicleToDrive": "vehicleToDrive: {}",
+            "isInBattle": "isInBattle: {}",
+            "roamPos": "roamPos: {}",
+            "arrivedPos": "arrivedPos: {}"
           }
         }
       },

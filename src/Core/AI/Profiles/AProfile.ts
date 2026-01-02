@@ -73,7 +73,7 @@ export interface CoreAI_SensorOptions {
     closestEnemySensor?: CoreAI_ClosestEnemySensorOptions
     vehicleToDriveSensor?: CoreAI_VehicleToDriveSensorOptions
     arrivalSensor?: CoreAI_ArrivalSensorOptions
-    onFootMoveToSensor?: CoreAI_MoveToSensorOptions
+    RoamSensor?: CoreAI_MoveToSensorOptions
     onDriveMoveToSensor?: CoreAI_MoveToSensorOptions
     moveToCapturePointSensor?: CoreAI_CapturePointSensorOptions
 }

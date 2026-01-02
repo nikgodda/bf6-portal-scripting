@@ -5,8 +5,8 @@ import { CoreAI_BehaviorMode } from '../BehaviorController'
 /**
  * MoveToBehavior:
  * - Starts movement in enter()
- * - Runs as long as memory.moveToPos exists
- * - Stopped automatically when TTL clears moveToPos
+ * - Runs as long as memory.roamPos exists
+ * - Stopped automatically when TTL clears roamPos
  * - Optional target enables AISetTarget during movement
  * - Mode selects on-foot or driver logic (never both)
  *
@@ -15,7 +15,7 @@ import { CoreAI_BehaviorMode } from '../BehaviorController'
 export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
     public name = 'moveto'
 
-    private moveToPos: mod.Vector
+    private roamPos: mod.Vector
     private readonly speed: mod.MoveSpeed
     private readonly mode: CoreAI_BehaviorMode
     private readonly arrivalDist: number
@@ -30,7 +30,7 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
         isValidated: boolean = true
     ) {
         super(brain)
-        this.moveToPos = pos
+        this.roamPos = pos
         this.speed = speed
         this.mode = mode
         this.arrivalDist = arrivalDist
@@ -60,37 +60,37 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
         mod.ForcePlayerToSeat(player, vehicle, 0)
         mod.AISetMoveSpeed(player, mod.MoveSpeed.Sprint)
         // mod.AIBattlefieldBehavior(player)
-        mod.AIDefendPositionBehavior(player, this.moveToPos, 0, 4)
+        mod.AIDefendPositionBehavior(player, this.roamPos, 0, 4)
         // mod.AIValidatedMoveToBehavior(player, this.targetPos)
     }
 
     private enterOnFootMove(player: mod.Player): void {
         mod.AISetMoveSpeed(player, this.speed)
         this.isValidated
-            ? mod.AIValidatedMoveToBehavior(player, this.moveToPos)
-            : mod.AIMoveToBehavior(player, this.moveToPos)
+            ? mod.AIValidatedMoveToBehavior(player, this.roamPos)
+            : mod.AIMoveToBehavior(player, this.roamPos)
     }
 
     override update(): void {
         const player = this.brain.player
         if (!mod.IsPlayerValid(player)) return
 
-        const memPos = this.brain.memory.get('moveToPos')
+        const memPos = this.brain.memory.get('roamPos')
         if (!memPos) return
 
         /* 
         // Conflicts with other Scores
-        if (!mod.Equals(memPos, this.moveToPos)) {
-            this.moveToPos = memPos
+        if (!mod.Equals(memPos, this.roamPos)) {
+            this.roamPos = memPos
             this.enter()
         } */
 
         const myPos = mod.GetObjectPosition(player)
-        const dist = mod.DistanceBetween(myPos, this.moveToPos)
+        const dist = mod.DistanceBetween(myPos, this.roamPos)
         const arrivalDist = this.arrivalDist
 
         if (dist < arrivalDist) {
-            this.brain.memory.set('moveToPos', null)
+            this.brain.memory.set('roamPos', null)
         }
     }
 

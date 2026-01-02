@@ -1,8 +1,8 @@
-import { CoreAI_ASensor } from '../ASensor'
-import { CoreAI_SensorContext } from '../SensorContext'
+import { CoreAI_ASensor } from './ASensor'
+import { CoreAI_SensorContext } from './SensorContext'
 
 /**
- * MoveToSensor:
+ * RoamSensor:
  * Picks a movement target from a list of points.
  *
  * Design:
@@ -11,7 +11,7 @@ import { CoreAI_SensorContext } from '../SensorContext'
  * - Velocity is preferred when speed > threshold.
  * - Intent direction stabilizes steering across replans.
  */
-export class CoreAI_OnDriveMoveToSensor extends CoreAI_ASensor {
+export class CoreAI_RoamSensor extends CoreAI_ASensor {
     private readonly ttlMs: number
 
     private coldStart: boolean = true
@@ -22,7 +22,7 @@ export class CoreAI_OnDriveMoveToSensor extends CoreAI_ASensor {
     constructor(
         private readonly getPoints: () => mod.Vector[],
         intervalMs: number = 750,
-        ttlMs: number = 6000
+        ttlMs: number = 2000
     ) {
         super(intervalMs)
         this.ttlMs = ttlMs
@@ -34,48 +34,36 @@ export class CoreAI_OnDriveMoveToSensor extends CoreAI_ASensor {
     }
 
     protected update(ctx: CoreAI_SensorContext): void {
-        const player = ctx.player
-        if (!mod.IsPlayerValid(player)) {
-            return
-        }
-
-        if (!mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle)) {
-            return
-        }
-
         // Do not reselect while intent exists
-        if (ctx.memory.get('moveToPos')) {
+        if (ctx.memory.get('roamPos')) {
             return
         }
+
+        const player = ctx.player
+        if (!mod.IsPlayerValid(player)) return
 
         const points = this.getPoints()
-        if (!points || points.length === 0) {
-            return
-        }
-
-        if (mod.GetPlayerVehicleSeat(player) !== 0) {
-            return
-        }
+        if (!points || points.length === 0) return
 
         const myPos = mod.GetObjectPosition(player)
-        const vehicle = mod.GetVehicleFromPlayer(player)
 
         // ------------------------------------------------------------
-        // Resolve forward direction (vehicle)
+        // Resolve forward direction
         // ------------------------------------------------------------
 
-        const vel = mod.GetVehicleState(
-            vehicle,
-            mod.VehicleStateVector.LinearVelocity
-        )
-        const speedSq = mod.DotProduct(vel, vel)
-        const speed = Math.sqrt(speedSq)
+        const speed = mod.GetSoldierState(player, mod.SoldierStateNumber.Speed)
 
         let forward: mod.Vector | null = null
 
         // 1. True movement direction
         if (speed > 0.3) {
-            if (speedSq > 0.1) {
+            const vel = mod.GetSoldierState(
+                player,
+                mod.SoldierStateVector.GetLinearVelocity
+            )
+            const lenSq = mod.DotProduct(vel, vel)
+
+            if (lenSq > 0.1) {
                 forward = mod.Normalize(vel)
                 this.lastIntentDir = forward
             }
@@ -88,9 +76,9 @@ export class CoreAI_OnDriveMoveToSensor extends CoreAI_ASensor {
 
         // 3. Facing fallback
         if (!forward) {
-            const face = mod.GetVehicleState(
-                vehicle,
-                mod.VehicleStateVector.FacingDirection
+            const face = mod.GetSoldierState(
+                player,
+                mod.SoldierStateVector.GetFacingDirection
             )
             forward = mod.Normalize(face)
             this.lastIntentDir = forward
@@ -106,7 +94,7 @@ export class CoreAI_OnDriveMoveToSensor extends CoreAI_ASensor {
             dot: number
         }[] = []
 
-        const ARRIVAL_EXCLUDE_DIST = 10.0
+        const ARRIVAL_EXCLUDE_DIST = 3.0
 
         for (const pos of points) {
             const dist = mod.DistanceBetween(myPos, pos)
@@ -155,7 +143,7 @@ export class CoreAI_OnDriveMoveToSensor extends CoreAI_ASensor {
         // Commit
         // ------------------------------------------------------------
 
-        ctx.memory.set('moveToPos', best.pos, this.ttlMs)
+        ctx.memory.set('roamPos', best.pos, this.ttlMs)
         this.lastIntentDir = mod.DirectionTowards(myPos, best.pos)
         this.coldStart = false
     }

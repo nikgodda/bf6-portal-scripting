@@ -40,6 +40,12 @@ export class CoreAI_BrainComponent implements CorePlayer_IComponent {
             OnAIMoveToFailed: () => {
                 this.brain.onMoveFinished(false)
             },
+            OnPlayerDied: () => {
+                this.brain.reset()
+            },
+            OnPlayerUndeploy: () => {
+                this.brain.reset()
+            },
         })
     }
 

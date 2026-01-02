@@ -8,12 +8,9 @@
 
 export type CoreAI_MemoryFields = {
     closestEnemy: mod.Player | null
-
     vehicleToDrive: mod.Vehicle | null
-
     isInBattle: boolean
-
-    moveToPos: mod.Vector | null // movement target
+    roamPos: mod.Vector | null // movement target
     arrivedPos: mod.Vector | null // semantic arrival
 }
 
@@ -26,7 +23,7 @@ export class CoreAI_MemoryManager {
         closestEnemy: null,
         vehicleToDrive: null,
         isInBattle: false,
-        moveToPos: null,
+        roamPos: null,
         arrivedPos: null,
     }
 
@@ -120,7 +117,7 @@ export class CoreAI_MemoryManager {
             closestEnemy: null,
             vehicleToDrive: null,
             isInBattle: false,
-            moveToPos: null,
+            roamPos: null,
             arrivedPos: null,
         }
 

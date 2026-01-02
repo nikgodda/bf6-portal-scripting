@@ -108,7 +108,7 @@ export class CoreAI_Brain {
 
     onDeployed(): void {}
 
-    onDied(): void {
+    reset(): void {
         this.perception.reset()
         this.memory.reset()
         this.behaviorController.resetAll()
@@ -125,7 +125,7 @@ export class CoreAI_Brain {
      * ------------------------------------------------------------ */
 
     onMoveFinished(success: boolean): void {
-        /* this.memory.set('moveToPos', null)
+        /* this.memory.set('roamPos', null)
         this.emit('OnMoveFinished', success) */
     }
 

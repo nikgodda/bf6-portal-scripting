@@ -1,5 +1,5 @@
-import { CoreAI_ASensor } from '../ASensor'
-import { CoreAI_SensorContext } from '../SensorContext'
+import { CoreAI_ASensor } from './ASensor'
+import { CoreAI_SensorContext } from './SensorContext'
 
 /**
  * ClosestEnemySensor:
@@ -7,7 +7,7 @@ import { CoreAI_SensorContext } from '../SensorContext'
  *
  * Writes:
  * - memory.closestEnemy
- * - memory.moveToPos
+ * - memory.roamPos
  *
  * Notes:
  * - No POIs are created.
@@ -39,7 +39,7 @@ export class CoreAI_ClosestEnemySensor extends CoreAI_ASensor {
         if (!mod.IsPlayerValid(newEnemy)) {
             // Clear enemy memory (TTL = immediate)
             ctx.memory.set('closestEnemy', null)
-            // ctx.memory.set('moveToPos', null)
+            // ctx.memory.set('roamPos', null)
             return
         }
 

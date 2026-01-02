@@ -15,7 +15,7 @@ export class PG_GameMode extends Core_AGameMode {
 
     private AI_UNSPAWN_DELAY = 10
     private AI_COUNT_TEAM_1 = 1
-    private AI_COUNT_TEAM_2 = 2
+    private AI_COUNT_TEAM_2 = 0
 
     private squadManager: Core_SquadManager | null = null
 
@@ -23,9 +23,8 @@ export class PG_GameMode extends Core_AGameMode {
         new CoreAI_CombatantProfile({
             fightSensor: {},
             /* closestEnemySensor: {}, */
-            onFootMoveToSensor: {
+            RoamSensor: {
                 getWPs: () => this.geRangeWPs(1000, 1010),
-                // getWPs: () => this.geRangeWPs(1000, 1010),
                 ttlMs: 4000,
             },
             vehicleToDriveSensor: {
@@ -38,8 +37,8 @@ export class PG_GameMode extends Core_AGameMode {
             fightSensor: {
                 ttlMs: 10000,
             },
-            onDriveMoveToSensor: {
-                getWPs: () => this.geRangeWPs(1106, 1108),
+            RoamSensor: {
+                getWPs: () => this.geRangeWPs(1107, 1109),
                 ttlMs: 60000,
             },
             /* arrivalSensor: {
