@@ -27,7 +27,7 @@ export class Player extends CorePlayer_APlayer {
                 }
 
                 mod.SetCameraTypeForPlayer(this.player, mod.Cameras.ThirdPerson)
-                mod.AIEnableShooting(this.player, false)
+                // mod.AIEnableShooting(this.player, false)
             },
 
             OnPlayerEnterVehicleSeat: (eventVehicle, eventSeat) => {

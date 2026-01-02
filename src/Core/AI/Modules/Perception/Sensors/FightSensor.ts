@@ -21,6 +21,8 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
     private hitWI: mod.WorldIcon
     private hitClosestEnemyWI: mod.WorldIcon
 
+    private VEHICLE_OFFSET = 5.1
+
     constructor(
         intervalMs: number = 500,
         private readonly ttlMs: number = 10000
@@ -98,8 +100,6 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
         ) */
         const myTeamId = mod.GetObjId(mod.GetTeam(player))
 
-        const RAYCAST_START_OFFSET = 5.1
-
         const playerVehiclePos = mod.GetVehicleState(
             mod.GetVehicleFromPlayer(player),
             mod.VehicleStateVector.VehiclePosition
@@ -145,7 +145,7 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
             const dir = mod.DirectionTowards(startInitPos, targetPos)
             const startPos = mod.Add(
                 startInitPos,
-                mod.Multiply(dir, RAYCAST_START_OFFSET)
+                mod.Multiply(dir, this.VEHICLE_OFFSET)
             )
 
             mod.RayCast(player, startPos, targetPos)
@@ -184,7 +184,7 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
         let maxHitDist = 0.4
 
         if (mod.GetSoldierState(enemy, mod.SoldierStateBool.IsInVehicle)) {
-            maxHitDist = 5.1
+            maxHitDist = this.VEHICLE_OFFSET
 
             const ep = mod.GetSoldierState(
                 enemy,
@@ -206,7 +206,7 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
 
         if (hitDist > maxHitDist) return
 
-        // ctx.memory.set('isInBattle', true, this.ttlMs)
+        ctx.memory.set('isInBattle', true, this.ttlMs)
     }
 
     override onDamaged?(
