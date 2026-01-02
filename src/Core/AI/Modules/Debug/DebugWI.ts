@@ -17,14 +17,27 @@ export class CoreAI_DebugWI {
     private battle: CoreAI_IDebugWI
     private calm: CoreAI_IDebugWI */
 
+    private receiver: mod.Player
+    private brain: CoreAI_Brain
+
     private behaviorWI: mod.WorldIcon
+    private behaviorColorsMap: Map<string, mod.Vector> = new Map([
+        ['fight', mod.CreateVector(1, 0, 0)],
+        ['defend', mod.CreateVector(1, 1, 0)],
+        ['idle', mod.CreateVector(1, 1, 1)],
+        ['moveto', mod.CreateVector(0, 1, 1)],
+        ['entervehicle', mod.CreateVector(0, 1, 0)],
+    ])
 
     private roamPosWI: mod.WorldIcon
     private vehicleToDriveWI: mod.WorldIcon
 
     private memoryWIs: Map<keyof CoreAI_MemoryFields, mod.WorldIcon> = new Map()
 
-    constructor(private receiver: mod.Player, private brain: CoreAI_Brain) {
+    constructor(receiver: mod.Player, brain: CoreAI_Brain) {
+        this.receiver = receiver
+        this.brain = brain
+
         this.behaviorWI = mod.SpawnObject(
             mod.RuntimeSpawn_Common.WorldIcon,
             mod.CreateVector(0, 0, 0),
@@ -113,6 +126,12 @@ export class CoreAI_DebugWI {
                     }`
                 )
             )
+            mod.SetWorldIconColor(
+                this.behaviorWI,
+                this.behaviorColorsMap.get(
+                    this.brain.behaviorController.currentBehavior().name
+                )!
+            )
         } else {
             mod.EnableWorldIconText(this.behaviorWI, false)
         }
@@ -127,8 +146,8 @@ export class CoreAI_DebugWI {
             mod.SetWorldIconColor(
                 wi,
                 this.brain.memory.getTimeRemaining(key) === 0
-                    ? CoreUI_Colors.White
-                    : CoreUI_Colors.GreenDark
+                    ? mod.CreateVector(1, 1, 1)
+                    : CoreUI_Colors.YellowDark
             )
             mod.EnableWorldIconText(wi, true)
             mod.SetWorldIconPosition(
@@ -194,140 +213,6 @@ export class CoreAI_DebugWI {
             mod.EnableWorldIconImage(this.vehicleToDriveWI, false)
             mod.EnableWorldIconText(this.vehicleToDriveWI, false)
         }
-
-        /* if (this.brain.memory.get('roamPos')) {
-            mod.SetWorldIconPosition(
-                this.roamPos_wi,
-                this.brain.memory.get('roamPos')!
-            )
-            mod.EnableWorldIconImage(this.roamPos_wi, true)
-            mod.SetWorldIconText(
-                this.roamPos_wi,
-                mod.Message(this.brain.memory.getTimeRemaining('roamPos'))
-            )
-            mod.EnableWorldIconText(this.roamPos_wi, true)
-        } else {
-            mod.EnableWorldIconImage(this.roamPos_wi, false)
-            mod.EnableWorldIconText(this.roamPos_wi, false)
-        }
-
-        if (this.brain.memory.get('vehicleToDrive')) {
-            mod.SetWorldIconPosition(
-                this.vehicleToDrive_wi,
-                mod.GetVehicleState(
-                    this.brain.memory.get('vehicleToDrive')!,
-                    mod.VehicleStateVector.VehiclePosition
-                )
-            )
-            mod.EnableWorldIconImage(this.vehicleToDrive_wi, true)
-            mod.SetWorldIconText(
-                this.vehicleToDrive_wi,
-                mod.Message(
-                    this.brain.memory.getTimeRemaining('vehicleToDrive')
-                )
-            )
-            mod.EnableWorldIconText(this.vehicleToDrive_wi, true)
-        } else {
-            mod.EnableWorldIconImage(this.vehicleToDrive_wi, false)
-            mod.EnableWorldIconText(this.vehicleToDrive_wi, false)
-        } */
-        /**
-         *
-         */
-        /* if (
-            !mod.IsPlayerValid(this.brain.player) ||
-            !mod.GetSoldierState(
-                this.brain.player,
-                mod.SoldierStateBool.IsAlive
-            )
-        ) {
-            mod.EnableWorldIconText(this.behavior.worldIcon, false)
-            mod.EnableWorldIconText(this.stats.worldIcon, false)
-            mod.EnableWorldIconText(this.battle.worldIcon, false)
-            mod.EnableWorldIconText(this.calm.worldIcon, false)
-            return
-        }
-
-        mod.EnableWorldIconText(this.behavior.worldIcon, true)
-        mod.EnableWorldIconText(this.stats.worldIcon, true)
-        mod.EnableWorldIconText(this.battle.worldIcon, true)
-        mod.EnableWorldIconText(this.calm.worldIcon, true) */
-        /**
-         * Behavior
-         */
-        /* this.update_wi(
-            this.behavior,
-            mod.Message(
-                `core.ai.debug.brain.behaviors.${
-                    this.brain.behaviorController.currentBehavior().name
-                }`
-            )
-        ) */
-        // Behavior Colors
-        /* switch (this.brain.behaviorController.currentBehavior().name) {
-            case 'fight':
-                mod.SetWorldIconColor(
-                    this.behavior.worldIcon,
-                    mod.CreateVector(1, 0, 0)
-                )
-                break
-            case 'defend':
-                mod.SetWorldIconColor(
-                    this.behavior.worldIcon,
-                    mod.CreateVector(0, 1, 1)
-                )
-                break
-            case 'moveto':
-                mod.SetWorldIconColor(
-                    this.behavior.worldIcon,
-                    mod.CreateVector(0, 1, 0)
-                )
-                break
-            case 'idle':
-                mod.SetWorldIconColor(
-                    this.behavior.worldIcon,
-                    mod.CreateVector(1, 1, 1)
-                )
-                break
-        } */
-        /**
-         * Stats (distance + team)
-         */
-        /* this.update_wi(
-            this.stats,
-            mod.Message(
-                `core.ai.debug.brain.distance`,
-                Math.floor(
-                    mod.DistanceBetween(
-                        mod.GetObjectPosition(this.brain.player),
-                        mod.GetObjectPosition(this.player)
-                    )
-                ),
-                mod.GetObjId(mod.GetTeam(this.brain.player))
-            )
-        ) */
-        /**
-         * Battle Memory fields
-         */
-        /* this.update_wi(
-            this.battle,
-            mod.Message(
-                `core.ai.debug.brain.memory.battle`,
-                this.brain.memory.getTimeRemaining('isInBattle'),
-                this.brain.memory.getTimeRemaining('closestEnemy')
-            )
-        ) */
-        /**
-         * Calm Memory fields
-         */
-        /* this.update_wi(
-            this.calm,
-            mod.Message(
-                `core.ai.debug.brain.memory.calm`,
-                this.brain.memory.getTimeRemaining('arrivedPos'),
-                this.brain.memory.getTimeRemaining('vehicleToDrive')
-            )
-        ) */
     }
 
     private round2decimal(num: number): number {

@@ -2076,8 +2076,9 @@ export class CoreAI_IdleBehavior extends CoreAI_ABehavior {
 
     override enter(): void {
         const player = this.brain.player
+
         if (mod.IsPlayerValid(player)) {
-            // mod.AIIdleBehavior(player)
+            mod.AIIdleBehavior(player)
         }
     }
 
@@ -2244,7 +2245,7 @@ export interface CoreAI_SensorOptions {
     closestEnemySensor?: CoreAI_ClosestEnemySensorOptions
     vehicleToDriveSensor?: CoreAI_VehicleToDriveSensorOptions
     arrivalSensor?: CoreAI_ArrivalSensorOptions
-    RoamSensor?: CoreAI_MoveToSensorOptions
+    roamSensor?: CoreAI_MoveToSensorOptions
     onDriveMoveToSensor?: CoreAI_MoveToSensorOptions
     moveToCapturePointSensor?: CoreAI_CapturePointSensorOptions
 }
@@ -2457,14 +2458,27 @@ export class CoreAI_DebugWI {
     private battle: CoreAI_IDebugWI
     private calm: CoreAI_IDebugWI */
 
+    private receiver: mod.Player
+    private brain: CoreAI_Brain
+
     private behaviorWI: mod.WorldIcon
+    private behaviorColorsMap: Map<string, mod.Vector> = new Map([
+        ['fight', mod.CreateVector(1, 0, 0)],
+        ['defend', mod.CreateVector(1, 1, 0)],
+        ['idle', mod.CreateVector(1, 1, 1)],
+        ['moveto', mod.CreateVector(0, 1, 1)],
+        ['entervehicle', mod.CreateVector(0, 1, 0)],
+    ])
 
     private roamPosWI: mod.WorldIcon
     private vehicleToDriveWI: mod.WorldIcon
 
     private memoryWIs: Map<keyof CoreAI_MemoryFields, mod.WorldIcon> = new Map()
 
-    constructor(private receiver: mod.Player, private brain: CoreAI_Brain) {
+    constructor(receiver: mod.Player, brain: CoreAI_Brain) {
+        this.receiver = receiver
+        this.brain = brain
+
         this.behaviorWI = mod.SpawnObject(
             mod.RuntimeSpawn_Common.WorldIcon,
             mod.CreateVector(0, 0, 0),
@@ -2553,6 +2567,12 @@ export class CoreAI_DebugWI {
                     }`
                 )
             )
+            mod.SetWorldIconColor(
+                this.behaviorWI,
+                this.behaviorColorsMap.get(
+                    this.brain.behaviorController.currentBehavior().name
+                )!
+            )
         } else {
             mod.EnableWorldIconText(this.behaviorWI, false)
         }
@@ -2567,8 +2587,8 @@ export class CoreAI_DebugWI {
             mod.SetWorldIconColor(
                 wi,
                 this.brain.memory.getTimeRemaining(key) === 0
-                    ? CoreUI_Colors.White
-                    : CoreUI_Colors.GreenDark
+                    ? mod.CreateVector(1, 1, 1)
+                    : CoreUI_Colors.YellowDark
             )
             mod.EnableWorldIconText(wi, true)
             mod.SetWorldIconPosition(
@@ -2634,140 +2654,6 @@ export class CoreAI_DebugWI {
             mod.EnableWorldIconImage(this.vehicleToDriveWI, false)
             mod.EnableWorldIconText(this.vehicleToDriveWI, false)
         }
-
-        /* if (this.brain.memory.get('roamPos')) {
-            mod.SetWorldIconPosition(
-                this.roamPos_wi,
-                this.brain.memory.get('roamPos')!
-            )
-            mod.EnableWorldIconImage(this.roamPos_wi, true)
-            mod.SetWorldIconText(
-                this.roamPos_wi,
-                mod.Message(this.brain.memory.getTimeRemaining('roamPos'))
-            )
-            mod.EnableWorldIconText(this.roamPos_wi, true)
-        } else {
-            mod.EnableWorldIconImage(this.roamPos_wi, false)
-            mod.EnableWorldIconText(this.roamPos_wi, false)
-        }
-
-        if (this.brain.memory.get('vehicleToDrive')) {
-            mod.SetWorldIconPosition(
-                this.vehicleToDrive_wi,
-                mod.GetVehicleState(
-                    this.brain.memory.get('vehicleToDrive')!,
-                    mod.VehicleStateVector.VehiclePosition
-                )
-            )
-            mod.EnableWorldIconImage(this.vehicleToDrive_wi, true)
-            mod.SetWorldIconText(
-                this.vehicleToDrive_wi,
-                mod.Message(
-                    this.brain.memory.getTimeRemaining('vehicleToDrive')
-                )
-            )
-            mod.EnableWorldIconText(this.vehicleToDrive_wi, true)
-        } else {
-            mod.EnableWorldIconImage(this.vehicleToDrive_wi, false)
-            mod.EnableWorldIconText(this.vehicleToDrive_wi, false)
-        } */
-        /**
-         *
-         */
-        /* if (
-            !mod.IsPlayerValid(this.brain.player) ||
-            !mod.GetSoldierState(
-                this.brain.player,
-                mod.SoldierStateBool.IsAlive
-            )
-        ) {
-            mod.EnableWorldIconText(this.behavior.worldIcon, false)
-            mod.EnableWorldIconText(this.stats.worldIcon, false)
-            mod.EnableWorldIconText(this.battle.worldIcon, false)
-            mod.EnableWorldIconText(this.calm.worldIcon, false)
-            return
-        }
-
-        mod.EnableWorldIconText(this.behavior.worldIcon, true)
-        mod.EnableWorldIconText(this.stats.worldIcon, true)
-        mod.EnableWorldIconText(this.battle.worldIcon, true)
-        mod.EnableWorldIconText(this.calm.worldIcon, true) */
-        /**
-         * Behavior
-         */
-        /* this.update_wi(
-            this.behavior,
-            mod.Message(
-                `core.ai.debug.brain.behaviors.${
-                    this.brain.behaviorController.currentBehavior().name
-                }`
-            )
-        ) */
-        // Behavior Colors
-        /* switch (this.brain.behaviorController.currentBehavior().name) {
-            case 'fight':
-                mod.SetWorldIconColor(
-                    this.behavior.worldIcon,
-                    mod.CreateVector(1, 0, 0)
-                )
-                break
-            case 'defend':
-                mod.SetWorldIconColor(
-                    this.behavior.worldIcon,
-                    mod.CreateVector(0, 1, 1)
-                )
-                break
-            case 'moveto':
-                mod.SetWorldIconColor(
-                    this.behavior.worldIcon,
-                    mod.CreateVector(0, 1, 0)
-                )
-                break
-            case 'idle':
-                mod.SetWorldIconColor(
-                    this.behavior.worldIcon,
-                    mod.CreateVector(1, 1, 1)
-                )
-                break
-        } */
-        /**
-         * Stats (distance + team)
-         */
-        /* this.update_wi(
-            this.stats,
-            mod.Message(
-                `core.ai.debug.brain.distance`,
-                Math.floor(
-                    mod.DistanceBetween(
-                        mod.GetObjectPosition(this.brain.player),
-                        mod.GetObjectPosition(this.player)
-                    )
-                ),
-                mod.GetObjId(mod.GetTeam(this.brain.player))
-            )
-        ) */
-        /**
-         * Battle Memory fields
-         */
-        /* this.update_wi(
-            this.battle,
-            mod.Message(
-                `core.ai.debug.brain.memory.battle`,
-                this.brain.memory.getTimeRemaining('isInBattle'),
-                this.brain.memory.getTimeRemaining('closestEnemy')
-            )
-        ) */
-        /**
-         * Calm Memory fields
-         */
-        /* this.update_wi(
-            this.calm,
-            mod.Message(
-                `core.ai.debug.brain.memory.calm`,
-                this.brain.memory.getTimeRemaining('arrivedPos'),
-                this.brain.memory.getTimeRemaining('vehicleToDrive')
-            )
-        ) */
     }
 
     private round2decimal(num: number): number {
@@ -2882,10 +2768,10 @@ export interface CoreAI_IBrainEvents {
  * - TaskSelector checks memory.isInBattle to understand combat state.
  */
 export class CoreAI_FightSensor extends CoreAI_ASensor {
-    private targetWI: mod.WorldIcon
+    /* private targetWI: mod.WorldIcon
     private startWI: mod.WorldIcon
     private hitWI: mod.WorldIcon
-    private hitClosestEnemyWI: mod.WorldIcon
+    private hitClosestEnemyWI: mod.WorldIcon */
 
     private VEHICLE_OFFSET = 5.1
 
@@ -2895,7 +2781,7 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
     ) {
         super(intervalMs)
 
-        this.targetWI = mod.SpawnObject(
+        /* this.targetWI = mod.SpawnObject(
             mod.RuntimeSpawn_Common.WorldIcon,
             mod.CreateVector(0, 0, 0),
             mod.CreateVector(0, 0, 0)
@@ -2929,7 +2815,7 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
         )
         mod.SetWorldIconOwner(this.hitClosestEnemyWI, mod.GetTeam(1))
         mod.SetWorldIconImage(this.hitClosestEnemyWI, mod.WorldIconImages.Alert)
-        mod.SetWorldIconColor(this.hitClosestEnemyWI, CoreUI_Colors.BlueDark)
+        mod.SetWorldIconColor(this.hitClosestEnemyWI, CoreUI_Colors.BlueDark) */
     }
 
     protected update(ctx: CoreAI_SensorContext): void {
@@ -2953,17 +2839,13 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
             !mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle) ||
             mod.GetPlayerVehicleSeat(player) !== 0
         ) {
-            mod.EnableWorldIconImage(this.targetWI, false)
+            /* mod.EnableWorldIconImage(this.targetWI, false)
             mod.EnableWorldIconImage(this.startWI, false)
             mod.EnableWorldIconImage(this.hitWI, false)
-            mod.EnableWorldIconImage(this.hitClosestEnemyWI, false)
+            mod.EnableWorldIconImage(this.hitClosestEnemyWI, false) */
             return
         }
 
-        /* const myEyesPos = mod.GetSoldierState(
-            player,
-            mod.SoldierStateVector.EyePosition
-        ) */
         const myTeamId = mod.GetObjId(mod.GetTeam(player))
 
         const playerVehiclePos = mod.GetVehicleState(
@@ -3016,11 +2898,14 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
 
             mod.RayCast(player, startPos, targetPos)
 
-            mod.EnableWorldIconImage(this.startWI, true)
+            /**
+             *
+             */
+            /* mod.EnableWorldIconImage(this.startWI, true)
             mod.SetWorldIconPosition(this.startWI, startPos)
 
             mod.EnableWorldIconImage(this.targetWI, true)
-            mod.SetWorldIconPosition(this.targetWI, targetPos)
+            mod.SetWorldIconPosition(this.targetWI, targetPos) */
         }
     }
 
@@ -3032,8 +2917,11 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
         const player = ctx.player
         if (!mod.IsPlayerValid(player)) return
 
-        mod.EnableWorldIconImage(this.hitWI, true)
-        mod.SetWorldIconPosition(this.hitWI, eventPoint)
+        /**
+         *
+         */
+        /* mod.EnableWorldIconImage(this.hitWI, true)
+        mod.SetWorldIconPosition(this.hitWI, eventPoint) */
 
         const myTeamId = mod.GetObjId(mod.GetTeam(player))
         const enemyTeamId = mod.GetTeam(myTeamId === 1 ? 2 : 1)
@@ -3068,7 +2956,7 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
 
         const hitDist = mod.DistanceBetween(eventPoint, enemyPos)
 
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(hitDist))
+        // mod.DisplayHighlightedWorldLogMessage(mod.Message(hitDist))
 
         if (hitDist > maxHitDist) return
 
@@ -4167,12 +4055,12 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
         )
 
         this.addSensorIf(
-            options.RoamSensor?.getWPs,
+            options.roamSensor?.getWPs,
             () =>
                 new CoreAI_RoamSensor(
-                    () => options.RoamSensor!.getWPs!(),
-                    options.RoamSensor?.intervalMs,
-                    options.RoamSensor?.ttlMs
+                    () => options.roamSensor!.getWPs!(),
+                    options.roamSensor?.intervalMs,
+                    options.roamSensor?.ttlMs
                 )
         )
     }
@@ -4334,7 +4222,7 @@ export class CoreAI_Squad {
 
         // Assign combatant profile configured to follow leader
         const profile = new CoreAI_CombatantProfile({
-            RoamSensor: {
+            roamSensor: {
                 getWPs: () => {
                     const p = this.getSquadPoint()
                     return p ? [p] : []
@@ -4507,7 +4395,7 @@ export class Player extends CorePlayer_APlayer {
                     brainComp.brain.installProfile(PG_GameMode.infantryProfile)
                 }
 
-                mod.SetCameraTypeForPlayer(this.player, mod.Cameras.ThirdPerson)
+                // mod.SetCameraTypeForPlayer(this.player, mod.Cameras.ThirdPerson)
                 // mod.AIEnableShooting(this.player, false)
             },
 
@@ -4546,19 +4434,21 @@ export class PG_GameMode extends Core_AGameMode {
     }
 
     private AI_UNSPAWN_DELAY = 10
-    private AI_COUNT_TEAM_1 = 0
-    private AI_COUNT_TEAM_2 = 1
+    private AI_COUNT_TEAM_1 = 1
+    private AI_COUNT_TEAM_2 = 2
 
     private squadManager: Core_SquadManager | null = null
 
     public static infantryProfile: CoreAI_BaseProfile =
         new CoreAI_CombatantProfile({
-            fightSensor: {},
-            /* closestEnemySensor: {}, */
-            /* RoamSensor: {
+            fightSensor: {
+                ttlMs: 10_000,
+            },
+            closestEnemySensor: {},
+            /* roamSensor: {
                 getWPs: () => PG_GameMode.getRangeWPs(1000, 1010),
                 ttlMs: 4_000,
-            },*/
+            }, */
             vehicleToDriveSensor: {
                 radius: 200,
             },
@@ -4569,12 +4459,12 @@ export class PG_GameMode extends Core_AGameMode {
             fightSensor: {
                 ttlMs: 10_000,
             },
-            /* RoamSensor: {
-                getWPs: () => PG_GameMode.getRangeWPs(1108, 1109),
+            roamSensor: {
+                getWPs: () => PG_GameMode.getRangeWPs(1106, 1107),
                 ttlMs: 60_000,
             },
-            arrivalSensor: {
-                getWPs: () => this.getRangeWPs(1108, 1109),
+            /* arrivalSensor: {
+                getWPs: () => this.getRangeWPs(1106, 1107),
                 ttlMs: 20_000,
                 cooldownMs: 40_000,
             }, */
@@ -4609,38 +4499,6 @@ export class PG_GameMode extends Core_AGameMode {
                 )
             )
         }
-
-        /*
-         *
-         */
-
-        mod.Wait(15).then(() => {
-            const vehicleSpawner = mod.SpawnObject(
-                mod.RuntimeSpawn_Common.VehicleSpawner,
-                mod.GetObjectPosition(mod.GetSpatialObject(1106)),
-                mod.CreateVector(0, 0, 0)
-            )
-
-            mod.SetVehicleSpawnerVehicleType(
-                vehicleSpawner,
-                mod.VehicleList.Abrams
-            )
-            mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
-        })
-
-        mod.Wait(14).then(() => {
-            const vehicleSpawner1 = mod.SpawnObject(
-                mod.RuntimeSpawn_Common.VehicleSpawner,
-                mod.GetObjectPosition(mod.GetSpatialObject(1107)),
-                mod.CreateVector(0, 0, 0)
-            )
-
-            mod.SetVehicleSpawnerVehicleType(
-                vehicleSpawner1,
-                mod.VehicleList.Abrams
-            )
-            mod.ForceVehicleSpawnerSpawn(vehicleSpawner1)
-        })
     }
 
     /*

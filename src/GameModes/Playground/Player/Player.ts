@@ -26,7 +26,7 @@ export class Player extends CorePlayer_APlayer {
                     brainComp.brain.installProfile(PG_GameMode.infantryProfile)
                 }
 
-                mod.SetCameraTypeForPlayer(this.player, mod.Cameras.ThirdPerson)
+                // mod.SetCameraTypeForPlayer(this.player, mod.Cameras.ThirdPerson)
                 // mod.AIEnableShooting(this.player, false)
             },
 

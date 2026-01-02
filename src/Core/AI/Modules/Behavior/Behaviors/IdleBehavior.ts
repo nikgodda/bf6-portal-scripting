@@ -15,8 +15,9 @@ export class CoreAI_IdleBehavior extends CoreAI_ABehavior {
 
     override enter(): void {
         const player = this.brain.player
+        
         if (mod.IsPlayerValid(player)) {
-            // mod.AIIdleBehavior(player)
+            mod.AIIdleBehavior(player)
         }
     }
 

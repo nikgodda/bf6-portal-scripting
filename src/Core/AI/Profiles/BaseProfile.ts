@@ -192,12 +192,12 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
         )
 
         this.addSensorIf(
-            options.RoamSensor?.getWPs,
+            options.roamSensor?.getWPs,
             () =>
                 new CoreAI_RoamSensor(
-                    () => options.RoamSensor!.getWPs!(),
-                    options.RoamSensor?.intervalMs,
-                    options.RoamSensor?.ttlMs
+                    () => options.roamSensor!.getWPs!(),
+                    options.roamSensor?.intervalMs,
+                    options.roamSensor?.ttlMs
                 )
         )
     }

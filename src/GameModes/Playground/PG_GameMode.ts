@@ -14,19 +14,21 @@ export class PG_GameMode extends Core_AGameMode {
     }
 
     private AI_UNSPAWN_DELAY = 10
-    private AI_COUNT_TEAM_1 = 0
-    private AI_COUNT_TEAM_2 = 1
+    private AI_COUNT_TEAM_1 = 1
+    private AI_COUNT_TEAM_2 = 2
 
     private squadManager: Core_SquadManager | null = null
 
     public static infantryProfile: CoreAI_BaseProfile =
         new CoreAI_CombatantProfile({
-            fightSensor: {},
-            /* closestEnemySensor: {}, */
-            /* RoamSensor: {
+            fightSensor: {
+                ttlMs: 10_000,
+            },
+            closestEnemySensor: {},
+            /* roamSensor: {
                 getWPs: () => PG_GameMode.getRangeWPs(1000, 1010),
                 ttlMs: 4_000,
-            },*/
+            }, */
             vehicleToDriveSensor: {
                 radius: 200,
             },
@@ -37,12 +39,12 @@ export class PG_GameMode extends Core_AGameMode {
             fightSensor: {
                 ttlMs: 10_000,
             },
-            /* RoamSensor: {
-                getWPs: () => PG_GameMode.getRangeWPs(1108, 1109),
+            roamSensor: {
+                getWPs: () => PG_GameMode.getRangeWPs(1106, 1107),
                 ttlMs: 60_000,
             },
-            arrivalSensor: {
-                getWPs: () => this.getRangeWPs(1108, 1109),
+            /* arrivalSensor: {
+                getWPs: () => this.getRangeWPs(1106, 1107),
                 ttlMs: 20_000,
                 cooldownMs: 40_000,
             }, */
@@ -77,38 +79,6 @@ export class PG_GameMode extends Core_AGameMode {
                 )
             )
         }
-
-        /*
-         *
-         */
-
-        mod.Wait(15).then(() => {
-            const vehicleSpawner = mod.SpawnObject(
-                mod.RuntimeSpawn_Common.VehicleSpawner,
-                mod.GetObjectPosition(mod.GetSpatialObject(1106)),
-                mod.CreateVector(0, 0, 0)
-            )
-
-            mod.SetVehicleSpawnerVehicleType(
-                vehicleSpawner,
-                mod.VehicleList.Abrams
-            )
-            mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
-        })
-
-        mod.Wait(14).then(() => {
-            const vehicleSpawner1 = mod.SpawnObject(
-                mod.RuntimeSpawn_Common.VehicleSpawner,
-                mod.GetObjectPosition(mod.GetSpatialObject(1107)),
-                mod.CreateVector(0, 0, 0)
-            )
-
-            mod.SetVehicleSpawnerVehicleType(
-                vehicleSpawner1,
-                mod.VehicleList.Abrams
-            )
-            mod.ForceVehicleSpawnerSpawn(vehicleSpawner1)
-        })
     }
 
     /*

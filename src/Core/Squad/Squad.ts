@@ -85,7 +85,7 @@ export class CoreAI_Squad {
 
         // Assign combatant profile configured to follow leader
         const profile = new CoreAI_CombatantProfile({
-            RoamSensor: {
+            roamSensor: {
                 getWPs: () => {
                     const p = this.getSquadPoint()
                     return p ? [p] : []

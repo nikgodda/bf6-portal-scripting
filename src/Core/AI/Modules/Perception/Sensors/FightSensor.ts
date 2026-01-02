@@ -16,10 +16,10 @@ import { CoreAI_SensorContext } from './SensorContext'
  * - TaskSelector checks memory.isInBattle to understand combat state.
  */
 export class CoreAI_FightSensor extends CoreAI_ASensor {
-    private targetWI: mod.WorldIcon
+    /* private targetWI: mod.WorldIcon
     private startWI: mod.WorldIcon
     private hitWI: mod.WorldIcon
-    private hitClosestEnemyWI: mod.WorldIcon
+    private hitClosestEnemyWI: mod.WorldIcon */
 
     private VEHICLE_OFFSET = 5.1
 
@@ -29,7 +29,7 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
     ) {
         super(intervalMs)
 
-        this.targetWI = mod.SpawnObject(
+        /* this.targetWI = mod.SpawnObject(
             mod.RuntimeSpawn_Common.WorldIcon,
             mod.CreateVector(0, 0, 0),
             mod.CreateVector(0, 0, 0)
@@ -63,7 +63,7 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
         )
         mod.SetWorldIconOwner(this.hitClosestEnemyWI, mod.GetTeam(1))
         mod.SetWorldIconImage(this.hitClosestEnemyWI, mod.WorldIconImages.Alert)
-        mod.SetWorldIconColor(this.hitClosestEnemyWI, CoreUI_Colors.BlueDark)
+        mod.SetWorldIconColor(this.hitClosestEnemyWI, CoreUI_Colors.BlueDark) */
     }
 
     protected update(ctx: CoreAI_SensorContext): void {
@@ -87,17 +87,13 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
             !mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle) ||
             mod.GetPlayerVehicleSeat(player) !== 0
         ) {
-            mod.EnableWorldIconImage(this.targetWI, false)
+            /* mod.EnableWorldIconImage(this.targetWI, false)
             mod.EnableWorldIconImage(this.startWI, false)
             mod.EnableWorldIconImage(this.hitWI, false)
-            mod.EnableWorldIconImage(this.hitClosestEnemyWI, false)
+            mod.EnableWorldIconImage(this.hitClosestEnemyWI, false) */
             return
         }
 
-        /* const myEyesPos = mod.GetSoldierState(
-            player,
-            mod.SoldierStateVector.EyePosition
-        ) */
         const myTeamId = mod.GetObjId(mod.GetTeam(player))
 
         const playerVehiclePos = mod.GetVehicleState(
@@ -150,11 +146,14 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
 
             mod.RayCast(player, startPos, targetPos)
 
-            mod.EnableWorldIconImage(this.startWI, true)
+            /**
+             * 
+             */
+            /* mod.EnableWorldIconImage(this.startWI, true)
             mod.SetWorldIconPosition(this.startWI, startPos)
 
             mod.EnableWorldIconImage(this.targetWI, true)
-            mod.SetWorldIconPosition(this.targetWI, targetPos)
+            mod.SetWorldIconPosition(this.targetWI, targetPos) */
         }
     }
 
@@ -166,8 +165,11 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
         const player = ctx.player
         if (!mod.IsPlayerValid(player)) return
 
-        mod.EnableWorldIconImage(this.hitWI, true)
-        mod.SetWorldIconPosition(this.hitWI, eventPoint)
+        /**
+         * 
+         */
+        /* mod.EnableWorldIconImage(this.hitWI, true)
+        mod.SetWorldIconPosition(this.hitWI, eventPoint) */
 
         const myTeamId = mod.GetObjId(mod.GetTeam(player))
         const enemyTeamId = mod.GetTeam(myTeamId === 1 ? 2 : 1)
@@ -202,7 +204,7 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
 
         const hitDist = mod.DistanceBetween(eventPoint, enemyPos)
 
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(hitDist))
+        // mod.DisplayHighlightedWorldLogMessage(mod.Message(hitDist))
 
         if (hitDist > maxHitDist) return
 
