@@ -15,7 +15,7 @@ export class PG_GameMode extends Core_AGameMode {
 
     private AI_UNSPAWN_DELAY = 10
     private AI_COUNT_TEAM_1 = 1
-    private AI_COUNT_TEAM_2 = 0
+    private AI_COUNT_TEAM_2 = 1
 
     private squadManager: Core_SquadManager | null = null
 
@@ -38,7 +38,7 @@ export class PG_GameMode extends Core_AGameMode {
                 ttlMs: 10000,
             },
             RoamSensor: {
-                getWPs: () => this.geRangeWPs(1107, 1109),
+                getWPs: () => this.geRangeWPs(1108, 1109),
                 ttlMs: 60000,
             },
             /* arrivalSensor: {
@@ -139,6 +139,38 @@ export class PG_GameMode extends Core_AGameMode {
         }
 
         brainComp.brain.installProfile(this.defVehicleProfile)
+    }
+
+    protected override OnPlayerDied(
+        eventPlayer: mod.Player,
+        eventOtherPlayer: mod.Player,
+        eventDeathType: mod.DeathType,
+        eventWeaponUnlock: mod.WeaponUnlock
+    ): void {
+        const lp = this.playerManager.get(eventPlayer)
+        if (!lp) return
+
+        const brainComp = lp.getComponent(CoreAI_BrainComponent)
+        if (!brainComp) {
+            return
+        }
+
+        brainComp.brain.installProfile(this.defInfantryProfile)
+    }
+
+    protected override OnPlayerExitVehicle(
+        eventPlayer: mod.Player,
+        eventVehicle: mod.Vehicle
+    ): void {
+        const lp = this.playerManager.get(eventPlayer)
+        if (!lp) return
+
+        const brainComp = lp.getComponent(CoreAI_BrainComponent)
+        if (!brainComp) {
+            return
+        }
+
+        brainComp.brain.installProfile(this.defInfantryProfile)
     }
 
     /*

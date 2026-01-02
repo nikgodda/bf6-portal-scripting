@@ -2249,11 +2249,112 @@ export interface CoreAI_SensorOptions {
     moveToCapturePointSensor?: CoreAI_CapturePointSensorOptions
 }
 
+// -------- FILE: src\Core\AI\Modules\Behavior\Behaviors\MoveToBehavior.ts --------
+/**
+ * MoveToBehavior:
+ * - Starts movement in enter()
+ * - Runs as long as memory.roamPos exists
+ * - Stopped automatically when TTL clears roamPos
+ * - Optional target enables AISetTarget during movement
+ * - Mode selects on-foot or driver logic (never both)
+ *
+ * TTL-driven memory replaces durationMs logic.
+ */
+export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
+    public name = 'moveto'
+
+    private roamPos: mod.Vector
+    private readonly speed: mod.MoveSpeed
+    private readonly mode: CoreAI_BehaviorMode
+    private readonly arrivalDist: number
+    private readonly isValidated: boolean
+
+    constructor(
+        brain: CoreAI_Brain,
+        pos: mod.Vector,
+        speed: mod.MoveSpeed = mod.MoveSpeed.Run,
+        mode: CoreAI_BehaviorMode = 'onFoot',
+        arrivalDist: number = 3,
+        isValidated: boolean = true
+    ) {
+        super(brain)
+        this.roamPos = pos
+        this.speed = speed
+        this.mode = mode
+        this.arrivalDist = arrivalDist
+        this.isValidated = isValidated
+    }
+
+    public getTargetPos(): mod.Vector {
+        return this.roamPos
+    }
+
+    override enter(): void {
+        const player = this.brain.player
+        if (!mod.IsPlayerValid(player)) {
+            return
+        }
+
+        if (this.mode === 'onDrive') {
+            this.enterOnDriveMove(player)
+            return
+        }
+
+        this.enterOnFootMove(player)
+    }
+
+    private async enterOnDriveMove(player: mod.Player): Promise<void> {
+        const vehicle = mod.GetVehicleFromPlayer(player)
+
+        mod.ForcePlayerExitVehicle(player, vehicle)
+        await mod.Wait(0)
+        await mod.Wait(0)
+        mod.ForcePlayerToSeat(player, vehicle, 0)
+        mod.AISetMoveSpeed(player, mod.MoveSpeed.Sprint)
+        // mod.AIBattlefieldBehavior(player)
+        mod.AIDefendPositionBehavior(player, this.roamPos, 0, 4)
+        // mod.AIValidatedMoveToBehavior(player, this.targetPos)
+    }
+
+    private enterOnFootMove(player: mod.Player): void {
+        mod.AISetMoveSpeed(player, this.speed)
+        this.isValidated
+            ? mod.AIValidatedMoveToBehavior(player, this.roamPos)
+            : mod.AIMoveToBehavior(player, this.roamPos)
+    }
+
+    override update(): void {
+        const player = this.brain.player
+        if (!mod.IsPlayerValid(player)) return
+
+        const memPos = this.brain.memory.get('roamPos')
+        if (!memPos) return
+
+        /*
+        // Conflicts with other Scores
+        if (!mod.Equals(memPos, this.roamPos)) {
+            this.roamPos = memPos
+            this.enter()
+        } */
+
+        const myPos = mod.GetObjectPosition(player)
+        const dist = mod.DistanceBetween(myPos, this.roamPos)
+        const arrivalDist = this.arrivalDist
+
+        if (dist < arrivalDist) {
+            this.brain.memory.set('roamPos', null)
+        }
+    }
+
+    override exit(): void {
+        // No target cleanup here; targeting is managed by the brain.
+    }
+}
+
 // -------- FILE: src\Core\AI\Modules\Task\TaskSelector.ts --------
 export class CoreAI_TaskSelector {
     private brain: CoreAI_Brain
     private profile: CoreAI_AProfile
-    private currentIndex: number | null = null
 
     constructor(brain: CoreAI_Brain, profile: CoreAI_AProfile) {
         this.brain = brain
@@ -2269,7 +2370,6 @@ export class CoreAI_TaskSelector {
 
         let bestEntry: CoreAI_ITaskScoringEntry | null = null
         let bestScore = -Infinity
-        let bestIndex: number | null = null
 
         // Evaluate profile scoring
         for (let i = 0; i < this.profile.scoring.length; i++) {
@@ -2278,17 +2378,14 @@ export class CoreAI_TaskSelector {
             if (score > bestScore) {
                 bestScore = score
                 bestEntry = entry
-                bestIndex = i
             }
         }
 
         // If nothing scores above zero -> idle
         if (!bestEntry || bestScore <= 0) {
             if (current instanceof CoreAI_IdleBehavior) {
-                this.currentIndex = null
                 return current
             }
-            this.currentIndex = null
             return new CoreAI_IdleBehavior(this.brain)
         }
 
@@ -2296,18 +2393,23 @@ export class CoreAI_TaskSelector {
         const temp = bestEntry.factory(this.brain)
         const nextClass = temp.constructor
 
-        // If same class -> never switch (no restarts)
-        if (
-            current &&
-            current.constructor === nextClass &&
-            bestIndex !== null &&
-            bestIndex === this.currentIndex
-        ) {
-            return current
+        // If same class -> don't switch (no restarts), except MoveTo when target changes.
+        if (current && current.constructor === nextClass) {
+            if (
+                current instanceof CoreAI_MoveToBehavior &&
+                temp instanceof CoreAI_MoveToBehavior
+            ) {
+                const currentPos = current.getTargetPos()
+                const nextPos = temp.getTargetPos()
+                if (mod.DistanceBetween(currentPos, nextPos) <= 0) {
+                    return current
+                }
+            } else {
+                return current
+            }
         }
 
         // Switch to new instance
-        this.currentIndex = bestIndex
         return temp
     }
 }
@@ -2353,8 +2455,8 @@ export class CoreAI_DebugWI {
     private battle: CoreAI_IDebugWI
     private calm: CoreAI_IDebugWI */
 
-    private roamPos_wi: mod.WorldIcon
-    private vehicleToDrive_wi: mod.WorldIcon
+    private roamPosWI: mod.WorldIcon
+    private vehicleToDriveWI: mod.WorldIcon
 
     private memoryWIs: Map<keyof CoreAI_MemoryFields, mod.WorldIcon> = new Map()
 
@@ -2387,25 +2489,25 @@ export class CoreAI_DebugWI {
         this.stats = { index: 1, worldIcon: this.spawn_wi(player) }
         this.behavior = { index: 0, worldIcon: this.spawn_wi(player) } */
 
-        this.roamPos_wi = mod.SpawnObject(
+        this.roamPosWI = mod.SpawnObject(
             mod.RuntimeSpawn_Common.WorldIcon,
             mod.CreateVector(0, 0, 0),
             mod.CreateVector(0, 0, 0)
         )
-        mod.SetWorldIconOwner(this.roamPos_wi, receiver)
-        mod.SetWorldIconImage(this.roamPos_wi, mod.WorldIconImages.Skull)
-        mod.EnableWorldIconImage(this.roamPos_wi, true)
-        mod.SetWorldIconColor(this.roamPos_wi, CoreUI_Colors.YellowDark)
+        mod.SetWorldIconOwner(this.roamPosWI, receiver)
+        mod.SetWorldIconImage(this.roamPosWI, mod.WorldIconImages.Skull)
+        mod.EnableWorldIconImage(this.roamPosWI, true)
+        mod.SetWorldIconColor(this.roamPosWI, CoreUI_Colors.YellowDark)
 
-        this.vehicleToDrive_wi = mod.SpawnObject(
+        this.vehicleToDriveWI = mod.SpawnObject(
             mod.RuntimeSpawn_Common.WorldIcon,
             mod.CreateVector(0, 0, 0),
             mod.CreateVector(0, 0, 0)
         )
-        mod.SetWorldIconOwner(this.vehicleToDrive_wi, receiver)
-        mod.SetWorldIconImage(this.vehicleToDrive_wi, mod.WorldIconImages.Bomb)
-        mod.EnableWorldIconImage(this.vehicleToDrive_wi, true)
-        mod.SetWorldIconColor(this.vehicleToDrive_wi, CoreUI_Colors.BlueDark)
+        mod.SetWorldIconOwner(this.vehicleToDriveWI, receiver)
+        mod.SetWorldIconImage(this.vehicleToDriveWI, mod.WorldIconImages.Skull)
+        mod.EnableWorldIconImage(this.vehicleToDriveWI, true)
+        mod.SetWorldIconColor(this.vehicleToDriveWI, CoreUI_Colors.BlueDark)
     }
 
     update() {
@@ -2426,7 +2528,7 @@ export class CoreAI_DebugWI {
                 wi,
                 this.brain.memory.getTimeRemaining(key) === 0
                     ? CoreUI_Colors.White
-                    : CoreUI_Colors.GreenLight
+                    : CoreUI_Colors.GreenDark
             )
             mod.EnableWorldIconText(wi, true)
             mod.SetWorldIconPosition(
@@ -2455,6 +2557,44 @@ export class CoreAI_DebugWI {
 
             i++
         }
+
+        if (this.brain.memory.get('roamPos')) {
+            mod.SetWorldIconPosition(
+                this.roamPosWI,
+                this.brain.memory.get('roamPos')!
+            )
+            mod.EnableWorldIconImage(this.roamPosWI, true)
+            mod.SetWorldIconText(
+                this.roamPosWI,
+                mod.Message(this.brain.memory.getTimeRemaining('roamPos'))
+            )
+            mod.EnableWorldIconText(this.roamPosWI, true)
+        } else {
+            mod.EnableWorldIconImage(this.roamPosWI, false)
+            mod.EnableWorldIconText(this.roamPosWI, false)
+        }
+
+        if (this.brain.memory.get('vehicleToDrive')) {
+            mod.SetWorldIconPosition(
+                this.vehicleToDriveWI,
+                mod.GetVehicleState(
+                    this.brain.memory.get('vehicleToDrive')!,
+                    mod.VehicleStateVector.VehiclePosition
+                )
+            )
+            mod.EnableWorldIconImage(this.vehicleToDriveWI, true)
+            mod.SetWorldIconText(
+                this.vehicleToDriveWI,
+                mod.Message(
+                    this.brain.memory.getTimeRemaining('vehicleToDrive')
+                )
+            )
+            mod.EnableWorldIconText(this.vehicleToDriveWI, true)
+        } else {
+            mod.EnableWorldIconImage(this.vehicleToDriveWI, false)
+            mod.EnableWorldIconText(this.vehicleToDriveWI, false)
+        }
+
         /* if (this.brain.memory.get('roamPos')) {
             mod.SetWorldIconPosition(
                 this.roamPos_wi,
@@ -3305,104 +3445,6 @@ export class CoreAI_EnterVehicleBehavior extends CoreAI_ABehavior {
     }
 }
 
-// -------- FILE: src\Core\AI\Modules\Behavior\Behaviors\MoveToBehavior.ts --------
-/**
- * MoveToBehavior:
- * - Starts movement in enter()
- * - Runs as long as memory.roamPos exists
- * - Stopped automatically when TTL clears roamPos
- * - Optional target enables AISetTarget during movement
- * - Mode selects on-foot or driver logic (never both)
- *
- * TTL-driven memory replaces durationMs logic.
- */
-export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
-    public name = 'moveto'
-
-    private roamPos: mod.Vector
-    private readonly speed: mod.MoveSpeed
-    private readonly mode: CoreAI_BehaviorMode
-    private readonly arrivalDist: number
-    private readonly isValidated: boolean
-
-    constructor(
-        brain: CoreAI_Brain,
-        pos: mod.Vector,
-        speed: mod.MoveSpeed = mod.MoveSpeed.Run,
-        mode: CoreAI_BehaviorMode = 'onFoot',
-        arrivalDist: number = 3,
-        isValidated: boolean = true
-    ) {
-        super(brain)
-        this.roamPos = pos
-        this.speed = speed
-        this.mode = mode
-        this.arrivalDist = arrivalDist
-        this.isValidated = isValidated
-    }
-
-    override enter(): void {
-        const player = this.brain.player
-        if (!mod.IsPlayerValid(player)) {
-            return
-        }
-
-        if (this.mode === 'onDrive') {
-            this.enterOnDriveMove(player)
-            return
-        }
-
-        this.enterOnFootMove(player)
-    }
-
-    private async enterOnDriveMove(player: mod.Player): Promise<void> {
-        const vehicle = mod.GetVehicleFromPlayer(player)
-
-        mod.ForcePlayerExitVehicle(player, vehicle)
-        await mod.Wait(0)
-        await mod.Wait(0)
-        mod.ForcePlayerToSeat(player, vehicle, 0)
-        mod.AISetMoveSpeed(player, mod.MoveSpeed.Sprint)
-        // mod.AIBattlefieldBehavior(player)
-        mod.AIDefendPositionBehavior(player, this.roamPos, 0, 4)
-        // mod.AIValidatedMoveToBehavior(player, this.targetPos)
-    }
-
-    private enterOnFootMove(player: mod.Player): void {
-        mod.AISetMoveSpeed(player, this.speed)
-        this.isValidated
-            ? mod.AIValidatedMoveToBehavior(player, this.roamPos)
-            : mod.AIMoveToBehavior(player, this.roamPos)
-    }
-
-    override update(): void {
-        const player = this.brain.player
-        if (!mod.IsPlayerValid(player)) return
-
-        const memPos = this.brain.memory.get('roamPos')
-        if (!memPos) return
-
-        /*
-        // Conflicts with other Scores
-        if (!mod.Equals(memPos, this.roamPos)) {
-            this.roamPos = memPos
-            this.enter()
-        } */
-
-        const myPos = mod.GetObjectPosition(player)
-        const dist = mod.DistanceBetween(myPos, this.roamPos)
-        const arrivalDist = this.arrivalDist
-
-        if (dist < arrivalDist) {
-            this.brain.memory.set('roamPos', null)
-        }
-    }
-
-    override exit(): void {
-        // No target cleanup here; targeting is managed by the brain.
-    }
-}
-
 // -------- FILE: src\Core\AI\Modules\Perception\Sensors\ClosestEnemySensor.ts --------
 /**
  * ClosestEnemySensor:
@@ -3930,7 +3972,7 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                     return new CoreAI_MoveToBehavior(
                         brain,
                         vPos,
-                        Math.random() < 0.3
+                        Math.random() < 0.7
                             ? mod.MoveSpeed.Sprint
                             : mod.MoveSpeed.Run,
                         'onFoot',
@@ -4489,7 +4531,7 @@ export class PG_GameMode extends Core_AGameMode {
 
     private AI_UNSPAWN_DELAY = 10
     private AI_COUNT_TEAM_1 = 1
-    private AI_COUNT_TEAM_2 = 0
+    private AI_COUNT_TEAM_2 = 1
 
     private squadManager: Core_SquadManager | null = null
 
@@ -4512,7 +4554,7 @@ export class PG_GameMode extends Core_AGameMode {
                 ttlMs: 10000,
             },
             RoamSensor: {
-                getWPs: () => this.geRangeWPs(1107, 1109),
+                getWPs: () => this.geRangeWPs(1108, 1109),
                 ttlMs: 60000,
             },
             /* arrivalSensor: {
@@ -4613,6 +4655,38 @@ export class PG_GameMode extends Core_AGameMode {
         }
 
         brainComp.brain.installProfile(this.defVehicleProfile)
+    }
+
+    protected override OnPlayerDied(
+        eventPlayer: mod.Player,
+        eventOtherPlayer: mod.Player,
+        eventDeathType: mod.DeathType,
+        eventWeaponUnlock: mod.WeaponUnlock
+    ): void {
+        const lp = this.playerManager.get(eventPlayer)
+        if (!lp) return
+
+        const brainComp = lp.getComponent(CoreAI_BrainComponent)
+        if (!brainComp) {
+            return
+        }
+
+        brainComp.brain.installProfile(this.defInfantryProfile)
+    }
+
+    protected override OnPlayerExitVehicle(
+        eventPlayer: mod.Player,
+        eventVehicle: mod.Vehicle
+    ): void {
+        const lp = this.playerManager.get(eventPlayer)
+        if (!lp) return
+
+        const brainComp = lp.getComponent(CoreAI_BrainComponent)
+        if (!brainComp) {
+            return
+        }
+
+        brainComp.brain.installProfile(this.defInfantryProfile)
     }
 
     /*

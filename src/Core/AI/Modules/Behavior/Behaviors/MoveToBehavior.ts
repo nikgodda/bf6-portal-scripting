@@ -37,6 +37,10 @@ export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
         this.isValidated = isValidated
     }
 
+    public getTargetPos(): mod.Vector {
+        return this.roamPos
+    }
+
     override enter(): void {
         const player = this.brain.player
         if (!mod.IsPlayerValid(player)) {

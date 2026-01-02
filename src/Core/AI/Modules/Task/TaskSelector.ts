@@ -1,12 +1,12 @@
 import { CoreAI_Brain } from '../../Brain'
 import { CoreAI_AProfile } from '../../Profiles/AProfile'
 import { CoreAI_IdleBehavior } from '../Behavior/Behaviors/IdleBehavior'
+import { CoreAI_MoveToBehavior } from '../Behavior/Behaviors/MoveToBehavior'
 import { CoreAI_ITaskScoringEntry } from './ITaskScoringEntry'
 
 export class CoreAI_TaskSelector {
     private brain: CoreAI_Brain
     private profile: CoreAI_AProfile
-    private currentIndex: number | null = null
 
     constructor(brain: CoreAI_Brain, profile: CoreAI_AProfile) {
         this.brain = brain
@@ -22,7 +22,6 @@ export class CoreAI_TaskSelector {
 
         let bestEntry: CoreAI_ITaskScoringEntry | null = null
         let bestScore = -Infinity
-        let bestIndex: number | null = null
 
         // Evaluate profile scoring
         for (let i = 0; i < this.profile.scoring.length; i++) {
@@ -31,17 +30,14 @@ export class CoreAI_TaskSelector {
             if (score > bestScore) {
                 bestScore = score
                 bestEntry = entry
-                bestIndex = i
             }
         }
 
         // If nothing scores above zero -> idle
         if (!bestEntry || bestScore <= 0) {
             if (current instanceof CoreAI_IdleBehavior) {
-                this.currentIndex = null
                 return current
             }
-            this.currentIndex = null
             return new CoreAI_IdleBehavior(this.brain)
         }
 
@@ -49,18 +45,23 @@ export class CoreAI_TaskSelector {
         const temp = bestEntry.factory(this.brain)
         const nextClass = temp.constructor
 
-        // If same class -> never switch (no restarts)
-        if (
-            current &&
-            current.constructor === nextClass &&
-            bestIndex !== null &&
-            bestIndex === this.currentIndex
-        ) {
-            return current
+        // If same class -> don't switch (no restarts), except MoveTo when target changes.
+        if (current && current.constructor === nextClass) {
+            if (
+                current instanceof CoreAI_MoveToBehavior &&
+                temp instanceof CoreAI_MoveToBehavior
+            ) {
+                const currentPos = current.getTargetPos()
+                const nextPos = temp.getTargetPos()
+                if (mod.DistanceBetween(currentPos, nextPos) <= 0) {
+                    return current
+                }
+            } else {
+                return current
+            }
         }
 
         // Switch to new instance
-        this.currentIndex = bestIndex
         return temp
     }
 }

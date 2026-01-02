@@ -15,8 +15,8 @@ export class CoreAI_DebugWI {
     private battle: CoreAI_IDebugWI
     private calm: CoreAI_IDebugWI */
 
-    private roamPos_wi: mod.WorldIcon
-    private vehicleToDrive_wi: mod.WorldIcon
+    private roamPosWI: mod.WorldIcon
+    private vehicleToDriveWI: mod.WorldIcon
 
     private memoryWIs: Map<keyof CoreAI_MemoryFields, mod.WorldIcon> = new Map()
 
@@ -49,25 +49,25 @@ export class CoreAI_DebugWI {
         this.stats = { index: 1, worldIcon: this.spawn_wi(player) }
         this.behavior = { index: 0, worldIcon: this.spawn_wi(player) } */
 
-        this.roamPos_wi = mod.SpawnObject(
+        this.roamPosWI = mod.SpawnObject(
             mod.RuntimeSpawn_Common.WorldIcon,
             mod.CreateVector(0, 0, 0),
             mod.CreateVector(0, 0, 0)
         )
-        mod.SetWorldIconOwner(this.roamPos_wi, receiver)
-        mod.SetWorldIconImage(this.roamPos_wi, mod.WorldIconImages.Skull)
-        mod.EnableWorldIconImage(this.roamPos_wi, true)
-        mod.SetWorldIconColor(this.roamPos_wi, CoreUI_Colors.YellowDark)
+        mod.SetWorldIconOwner(this.roamPosWI, receiver)
+        mod.SetWorldIconImage(this.roamPosWI, mod.WorldIconImages.Skull)
+        mod.EnableWorldIconImage(this.roamPosWI, true)
+        mod.SetWorldIconColor(this.roamPosWI, CoreUI_Colors.YellowDark)
 
-        this.vehicleToDrive_wi = mod.SpawnObject(
+        this.vehicleToDriveWI = mod.SpawnObject(
             mod.RuntimeSpawn_Common.WorldIcon,
             mod.CreateVector(0, 0, 0),
             mod.CreateVector(0, 0, 0)
         )
-        mod.SetWorldIconOwner(this.vehicleToDrive_wi, receiver)
-        mod.SetWorldIconImage(this.vehicleToDrive_wi, mod.WorldIconImages.Bomb)
-        mod.EnableWorldIconImage(this.vehicleToDrive_wi, true)
-        mod.SetWorldIconColor(this.vehicleToDrive_wi, CoreUI_Colors.BlueDark)
+        mod.SetWorldIconOwner(this.vehicleToDriveWI, receiver)
+        mod.SetWorldIconImage(this.vehicleToDriveWI, mod.WorldIconImages.Skull)
+        mod.EnableWorldIconImage(this.vehicleToDriveWI, true)
+        mod.SetWorldIconColor(this.vehicleToDriveWI, CoreUI_Colors.BlueDark)
     }
 
     update() {
@@ -88,7 +88,7 @@ export class CoreAI_DebugWI {
                 wi,
                 this.brain.memory.getTimeRemaining(key) === 0
                     ? CoreUI_Colors.White
-                    : CoreUI_Colors.GreenLight
+                    : CoreUI_Colors.GreenDark
             )
             mod.EnableWorldIconText(wi, true)
             mod.SetWorldIconPosition(
@@ -117,6 +117,44 @@ export class CoreAI_DebugWI {
 
             i++
         }
+
+        if (this.brain.memory.get('roamPos')) {
+            mod.SetWorldIconPosition(
+                this.roamPosWI,
+                this.brain.memory.get('roamPos')!
+            )
+            mod.EnableWorldIconImage(this.roamPosWI, true)
+            mod.SetWorldIconText(
+                this.roamPosWI,
+                mod.Message(this.brain.memory.getTimeRemaining('roamPos'))
+            )
+            mod.EnableWorldIconText(this.roamPosWI, true)
+        } else {
+            mod.EnableWorldIconImage(this.roamPosWI, false)
+            mod.EnableWorldIconText(this.roamPosWI, false)
+        }
+
+        if (this.brain.memory.get('vehicleToDrive')) {
+            mod.SetWorldIconPosition(
+                this.vehicleToDriveWI,
+                mod.GetVehicleState(
+                    this.brain.memory.get('vehicleToDrive')!,
+                    mod.VehicleStateVector.VehiclePosition
+                )
+            )
+            mod.EnableWorldIconImage(this.vehicleToDriveWI, true)
+            mod.SetWorldIconText(
+                this.vehicleToDriveWI,
+                mod.Message(
+                    this.brain.memory.getTimeRemaining('vehicleToDrive')
+                )
+            )
+            mod.EnableWorldIconText(this.vehicleToDriveWI, true)
+        } else {
+            mod.EnableWorldIconImage(this.vehicleToDriveWI, false)
+            mod.EnableWorldIconText(this.vehicleToDriveWI, false)
+        }
+
         /* if (this.brain.memory.get('roamPos')) {
             mod.SetWorldIconPosition(
                 this.roamPos_wi,

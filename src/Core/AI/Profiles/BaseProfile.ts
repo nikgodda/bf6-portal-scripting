@@ -73,7 +73,7 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                     return new CoreAI_MoveToBehavior(
                         brain,
                         vPos,
-                        Math.random() < 0.3
+                        Math.random() < 0.7
                             ? mod.MoveSpeed.Sprint
                             : mod.MoveSpeed.Run,
                         'onFoot',
