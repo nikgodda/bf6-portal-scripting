@@ -4,6 +4,8 @@ import { CoreAI_MemoryFields } from '../Memory/MemoryManager'
 
 // @stringkeys core.ai.debug.brain.memory: closestEnemy {}, vehicleToDrive {}, isInBattle {}, roamPos {}, arrivedPos {}
 
+// @stringkeys core.ai.debug.brain.behaviors: fight, defend, idle, moveto, entervehicle
+
 export interface CoreAI_IDebugWI {
     index: number
     worldIcon: mod.WorldIcon
@@ -15,13 +17,23 @@ export class CoreAI_DebugWI {
     private battle: CoreAI_IDebugWI
     private calm: CoreAI_IDebugWI */
 
+    private behaviorWI: mod.WorldIcon
+
     private roamPosWI: mod.WorldIcon
     private vehicleToDriveWI: mod.WorldIcon
 
     private memoryWIs: Map<keyof CoreAI_MemoryFields, mod.WorldIcon> = new Map()
 
     constructor(private receiver: mod.Player, private brain: CoreAI_Brain) {
-        let i = 0
+        this.behaviorWI = mod.SpawnObject(
+            mod.RuntimeSpawn_Common.WorldIcon,
+            mod.CreateVector(0, 0, 0),
+            mod.CreateVector(0, 0, 0)
+        )
+        mod.SetWorldIconColor(this.behaviorWI, CoreUI_Colors.BlueDark)
+        mod.SetWorldIconOwner(this.behaviorWI, receiver)
+
+        let i = 1
         for (const key of Object.keys(this.brain.memory.data) as Array<
             keyof typeof this.brain.memory.data
         >) {
@@ -71,15 +83,43 @@ export class CoreAI_DebugWI {
     }
 
     update() {
-        let i = 0
-        for (const [key, wi] of this.memoryWIs) {
-            if (
-                !mod.IsPlayerValid(this.brain.player) ||
-                !mod.GetSoldierState(
-                    this.brain.player,
-                    mod.SoldierStateBool.IsAlive
+        const isValid =
+            mod.IsPlayerValid(this.brain.player) &&
+            mod.GetSoldierState(this.brain.player, mod.SoldierStateBool.IsAlive)
+
+        if (isValid) {
+            mod.EnableWorldIconText(this.behaviorWI, true)
+            mod.SetWorldIconPosition(
+                this.behaviorWI,
+                mod.CreateVector(
+                    mod.XComponentOf(mod.GetObjectPosition(this.brain.player)),
+                    mod.YComponentOf(mod.GetObjectPosition(this.brain.player)) +
+                        this.getStackedIconOffset(
+                            mod.DistanceBetween(
+                                mod.GetObjectPosition(this.brain.player),
+                                mod.GetObjectPosition(this.receiver)
+                            ),
+                            0,
+                            0.6
+                        ),
+                    mod.ZComponentOf(mod.GetObjectPosition(this.brain.player))
                 )
-            ) {
+            )
+            mod.SetWorldIconText(
+                this.behaviorWI,
+                mod.Message(
+                    `core.ai.debug.brain.behaviors.${
+                        this.brain.behaviorController.currentBehavior().name
+                    }`
+                )
+            )
+        } else {
+            mod.EnableWorldIconText(this.behaviorWI, false)
+        }
+
+        let i = 1
+        for (const [key, wi] of this.memoryWIs) {
+            if (!isValid) {
                 mod.EnableWorldIconText(wi, false)
                 continue
             }
@@ -212,7 +252,6 @@ export class CoreAI_DebugWI {
         mod.EnableWorldIconText(this.stats.worldIcon, true)
         mod.EnableWorldIconText(this.battle.worldIcon, true)
         mod.EnableWorldIconText(this.calm.worldIcon, true) */
-        // @stringkeys core.ai.debug.brain.behaviors: fight, defend, idle, moveto
         /**
          * Behavior
          */

@@ -1,7 +1,7 @@
-import { CoreAI_CombatantProfile } from 'src/Core/AI/Profiles/CombatantProfile'
+import { CoreAI_BrainComponent } from 'src/Core/AI/Components/BrainComponent'
 import { CorePlayer_APlayer } from 'src/Core/Player/APlayer'
-import { CorePlayer_BattleStatsComponent } from 'src/Core/Player/Components/BattleStats/BattleStatsComponent'
 import { CorePlayer_ProtectionComponent } from 'src/Core/Player/Components/Protection/ProtectionComponent'
+import { PG_GameMode } from '../PG_GameMode'
 
 export class Player extends CorePlayer_APlayer {
     protectionComp: CorePlayer_ProtectionComponent
@@ -12,6 +12,8 @@ export class Player extends CorePlayer_APlayer {
         this.protectionComp = new CorePlayer_ProtectionComponent()
         this.addComponent(this.protectionComp)
 
+        console.log(1)
+
         this.addListener({
             OnPlayerDeployed: () => {
                 // spawn protection
@@ -19,8 +21,31 @@ export class Player extends CorePlayer_APlayer {
                     ? this.protectionComp.activate(5)
                     : this.protectionComp.activate()
 
-                // mod.SetCameraTypeForPlayer(this.player, mod.Cameras.ThirdPerson)
-                // mod.AIEnableShooting(this.player, false)
+                const brainComp = this.getComponent(CoreAI_BrainComponent)
+                if (brainComp) {
+                    brainComp.brain.installProfile(PG_GameMode.infantryProfile)
+                }
+
+                mod.SetCameraTypeForPlayer(this.player, mod.Cameras.ThirdPerson)
+                mod.AIEnableShooting(this.player, false)
+            },
+
+            OnPlayerEnterVehicleSeat: (eventVehicle, eventSeat) => {
+                const brainComp = this.getComponent(CoreAI_BrainComponent)
+                if (brainComp) {
+                    if (mod.GetPlayerVehicleSeat(this.player) !== 0) {
+                        return
+                    }
+
+                    brainComp.brain.installProfile(PG_GameMode.driverProfile)
+                }
+            },
+
+            OnPlayerExitVehicle: (eventVehicle) => {
+                const brainComp = this.getComponent(CoreAI_BrainComponent)
+                if (brainComp) {
+                    brainComp.brain.installProfile(PG_GameMode.infantryProfile)
+                }
             },
         })
     }

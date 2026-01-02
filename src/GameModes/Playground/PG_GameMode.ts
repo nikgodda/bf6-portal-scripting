@@ -14,39 +14,39 @@ export class PG_GameMode extends Core_AGameMode {
     }
 
     private AI_UNSPAWN_DELAY = 10
-    private AI_COUNT_TEAM_1 = 1
+    private AI_COUNT_TEAM_1 = 0
     private AI_COUNT_TEAM_2 = 1
 
     private squadManager: Core_SquadManager | null = null
 
-    private defInfantryProfile: CoreAI_BaseProfile =
+    public static infantryProfile: CoreAI_BaseProfile =
         new CoreAI_CombatantProfile({
             fightSensor: {},
             /* closestEnemySensor: {}, */
-            RoamSensor: {
-                getWPs: () => this.geRangeWPs(1000, 1010),
-                ttlMs: 4000,
-            },
+            /* RoamSensor: {
+                getWPs: () => PG_GameMode.getRangeWPs(1000, 1010),
+                ttlMs: 4_000,
+            },*/
             vehicleToDriveSensor: {
                 radius: 200,
             },
         })
 
-    private defVehicleProfile: CoreAI_BaseProfile = new CoreAI_CombatantProfile(
-        {
+    public static driverProfile: CoreAI_BaseProfile =
+        new CoreAI_CombatantProfile({
             fightSensor: {
-                ttlMs: 10000,
+                ttlMs: 10_000,
             },
-            RoamSensor: {
-                getWPs: () => this.geRangeWPs(1108, 1109),
-                ttlMs: 60000,
+            /* RoamSensor: {
+                getWPs: () => PG_GameMode.getRangeWPs(1108, 1109),
+                ttlMs: 60_000,
             },
-            /* arrivalSensor: {
-                getWPs: () => this.geRangeWPs(1100, 1107),
-                ttlMs: 20000,
+            arrivalSensor: {
+                getWPs: () => this.getRangeWPs(1108, 1109),
+                ttlMs: 20_000,
+                cooldownMs: 40_000,
             }, */
-        }
-    )
+        })
 
     protected override OnGameModeStarted(): void {
         // One-time game setup (rules, scoreboard, AI bootstrap)
@@ -82,7 +82,7 @@ export class PG_GameMode extends Core_AGameMode {
          *
          */
 
-        mod.Wait(30).then(() => {
+        mod.Wait(15).then(() => {
             const vehicleSpawner = mod.SpawnObject(
                 mod.RuntimeSpawn_Common.VehicleSpawner,
                 mod.GetObjectPosition(mod.GetSpatialObject(1106)),
@@ -96,7 +96,7 @@ export class PG_GameMode extends Core_AGameMode {
             mod.ForceVehicleSpawnerSpawn(vehicleSpawner)
         })
 
-        mod.Wait(31).then(() => {
+        mod.Wait(14).then(() => {
             const vehicleSpawner1 = mod.SpawnObject(
                 mod.RuntimeSpawn_Common.VehicleSpawner,
                 mod.GetObjectPosition(mod.GetSpatialObject(1107)),
@@ -119,60 +119,6 @@ export class PG_GameMode extends Core_AGameMode {
         mod.DisplayHighlightedWorldLogMessage(mod.Message(666))
     }
 
-    protected override OnPlayerEnterVehicleSeat(
-        eventPlayer: mod.Player,
-        eventVehicle: mod.Vehicle,
-        eventSeat: mod.Object
-    ): void {
-        const lp = this.playerManager.get(eventPlayer)
-        if (!lp) return
-
-        const brainComp = lp.getComponent(CoreAI_BrainComponent)
-        if (!brainComp) {
-            return
-        }
-
-        const seat = mod.GetPlayerVehicleSeat(eventPlayer)
-
-        if (seat !== 0) {
-            return
-        }
-
-        brainComp.brain.installProfile(this.defVehicleProfile)
-    }
-
-    protected override OnPlayerDied(
-        eventPlayer: mod.Player,
-        eventOtherPlayer: mod.Player,
-        eventDeathType: mod.DeathType,
-        eventWeaponUnlock: mod.WeaponUnlock
-    ): void {
-        const lp = this.playerManager.get(eventPlayer)
-        if (!lp) return
-
-        const brainComp = lp.getComponent(CoreAI_BrainComponent)
-        if (!brainComp) {
-            return
-        }
-
-        brainComp.brain.installProfile(this.defInfantryProfile)
-    }
-
-    protected override OnPlayerExitVehicle(
-        eventPlayer: mod.Player,
-        eventVehicle: mod.Vehicle
-    ): void {
-        const lp = this.playerManager.get(eventPlayer)
-        if (!lp) return
-
-        const brainComp = lp.getComponent(CoreAI_BrainComponent)
-        if (!brainComp) {
-            return
-        }
-
-        brainComp.brain.installProfile(this.defInfantryProfile)
-    }
-
     /*
      *
      */
@@ -180,6 +126,7 @@ export class PG_GameMode extends Core_AGameMode {
     protected override async OnLogicalPlayerJoinGame(
         lp: CorePlayer_APlayer
     ): Promise<void> {
+        console.log(2)
         // Attach AI brain to logical AI players only
         if (lp.isAI()) {
             /* if (lp.teamId === 1) {
@@ -189,7 +136,7 @@ export class PG_GameMode extends Core_AGameMode {
 
             const brain = new CoreAI_Brain(
                 lp.player,
-                this.defInfantryProfile,
+                PG_GameMode.infantryProfile,
                 true
             )
 
@@ -218,7 +165,7 @@ export class PG_GameMode extends Core_AGameMode {
         }
     }
 
-    private geRangeWPs(from: number, to: number): mod.Vector[] {
+    private static getRangeWPs(from: number, to: number): mod.Vector[] {
         const out: mod.Vector[] = []
 
         for (let id = from; id <= to; id++) {

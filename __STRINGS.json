@@ -4,12 +4,11 @@
       "debug": {
         "brain": {
           "behaviors": {
-            "fight": "fight",
-            "closestenemy": "closestenemy",
             "defend": "defend",
+            "entervehicle": "entervehicle",
+            "fight": "fight",
             "idle": "idle",
-            "moveto": "moveto",
-            "follow": "follow"
+            "moveto": "moveto"
           },
           "distance": "dis: {} | tea: {}",
           "memory": {
