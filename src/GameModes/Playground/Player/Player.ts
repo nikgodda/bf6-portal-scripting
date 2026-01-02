@@ -12,14 +12,12 @@ export class Player extends CorePlayer_APlayer {
         this.protectionComp = new CorePlayer_ProtectionComponent()
         this.addComponent(this.protectionComp)
 
-        console.log(1)
-
         this.addListener({
             OnPlayerDeployed: () => {
                 // spawn protection
                 this.isLogicalAI()
                     ? this.protectionComp.activate(5)
-                    : this.protectionComp.activate()
+                    : this.protectionComp.activate(5)
 
                 const brainComp = this.getComponent(CoreAI_BrainComponent)
                 if (brainComp) {

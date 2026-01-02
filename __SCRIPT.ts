@@ -4381,14 +4381,12 @@ export class Player extends CorePlayer_APlayer {
         this.protectionComp = new CorePlayer_ProtectionComponent()
         this.addComponent(this.protectionComp)
 
-        console.log(1)
-
         this.addListener({
             OnPlayerDeployed: () => {
                 // spawn protection
                 this.isLogicalAI()
                     ? this.protectionComp.activate(5)
-                    : this.protectionComp.activate()
+                    : this.protectionComp.activate(5)
 
                 const brainComp = this.getComponent(CoreAI_BrainComponent)
                 if (brainComp) {
@@ -4450,7 +4448,7 @@ export class PG_GameMode extends Core_AGameMode {
                 ttlMs: 4_000,
             }, */
             vehicleToDriveSensor: {
-                radius: 200,
+                radius: 100,
             },
         })
 
@@ -4472,7 +4470,7 @@ export class PG_GameMode extends Core_AGameMode {
 
     protected override OnGameModeStarted(): void {
         // One-time game setup (rules, scoreboard, AI bootstrap)
-        mod.SetAIToHumanDamageModifier(2)
+        // mod.SetAIToHumanDamageModifier(2)
         mod.SetFriendlyFire(true)
 
         // Spawn initial logical bots
@@ -4516,7 +4514,6 @@ export class PG_GameMode extends Core_AGameMode {
     protected override async OnLogicalPlayerJoinGame(
         lp: CorePlayer_APlayer
     ): Promise<void> {
-        console.log(2)
         // Attach AI brain to logical AI players only
         if (lp.isAI()) {
             /* if (lp.teamId === 1) {
@@ -4527,7 +4524,7 @@ export class PG_GameMode extends Core_AGameMode {
             const brain = new CoreAI_Brain(
                 lp.player,
                 PG_GameMode.infantryProfile,
-                true
+                false
             )
 
             lp.addComponent(new CoreAI_BrainComponent(brain))
