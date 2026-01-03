@@ -1723,785 +1723,6 @@ export abstract class Core_AGameMode<
     }
 }
 
-// -------- FILE: src\Core\Player\Components\Protection\ProtectionComponent.ts --------
-export class CorePlayer_ProtectionComponent implements CorePlayer_IComponent {
-    private ap!: CorePlayer_APlayer
-    private active: boolean = false
-    private deactivateAt: number = 0
-
-    onAttach(ap: CorePlayer_APlayer): void {
-        this.ap = ap
-
-        ap.addListener({
-            OngoingPlayer: () => {
-                if (!this.active) return
-
-                if (this.deactivateAt > 0 && Date.now() >= this.deactivateAt) {
-                    this.deactivate()
-                }
-            },
-        })
-    }
-
-    onDetach(ap: CorePlayer_APlayer): void {
-        this.active = false
-        this.deactivateAt = 0
-    }
-
-    activate(durationSec?: number): void {
-        this.active = true
-
-        mod.SetPlayerIncomingDamageFactor(this.ap.player, 0)
-
-        if (durationSec && durationSec > 0) {
-            this.deactivateAt = Date.now() + durationSec * 1000
-        } else {
-            this.deactivateAt = 0
-        }
-    }
-
-    deactivate(): void {
-        this.active = false
-        this.deactivateAt = 0
-
-        // BUG: setting 1 does NOT work
-        mod.SetPlayerIncomingDamageFactor(this.ap.player, 0.999)
-    }
-
-    isActive(): boolean {
-        return this.active
-    }
-}
-
-// -------- FILE: src\Core\Player\Components\BattleStats\BattleStatsComponent.ts --------
-export class CorePlayer_BattleStatsComponent implements CorePlayer_IComponent {
-    private kills = 0
-    private deaths = 0
-    private teamKills = 0
-    private score = 0
-    private killStreak = 0
-
-    onAttach(ap: CorePlayer_APlayer): void {
-        // No-op
-    }
-
-    onDetach(ap: CorePlayer_APlayer): void {
-        // No-op
-    }
-
-    /* ------------------------------------------------------------
-     * Kills
-     * ------------------------------------------------------------ */
-
-    getKills(): number {
-        return this.kills
-    }
-
-    addKill(amount = 1): void {
-        this.kills += amount
-    }
-
-    /* ------------------------------------------------------------
-     * Deaths
-     * ------------------------------------------------------------ */
-
-    getDeaths(): number {
-        return this.deaths
-    }
-
-    addDeath(amount = 1): void {
-        this.deaths += amount
-    }
-
-    /* ------------------------------------------------------------
-     * Team kills
-     * ------------------------------------------------------------ */
-
-    getTeamKills(): number {
-        return this.teamKills
-    }
-
-    addTeamKill(amount = 1): void {
-        this.teamKills += amount
-    }
-
-    /* ------------------------------------------------------------
-     * Score
-     * ------------------------------------------------------------ */
-
-    getScore(): number {
-        return this.score
-    }
-
-    setScore(value: number): void {
-        this.score = value
-    }
-
-    addScore(delta: number): void {
-        this.score += delta
-    }
-
-    /* ------------------------------------------------------------
-     * Killstreak
-     * ------------------------------------------------------------ */
-
-    getKillStreak(): number {
-        return this.killStreak
-    }
-
-    addKillStreak(amount = 1): void {
-        this.killStreak += amount
-    }
-
-    clearKillStreak(): void {
-        this.killStreak = 0
-    }
-}
-
-// -------- FILE: src\Core\Player\Components\Loadout\ALoadoutItem.ts --------
-// Abstract base class for all loadout items.
-// This defines common properties only and enforces valid inheritance.
-
-export abstract class CorePlayer_ALoadoutItem {
-    constructor(
-        public readonly slot: mod.InventorySlots,
-        public readonly name: string
-    ) {}
-}
-
-// -------- FILE: src\Core\Player\Components\Loadout\GadgetLoadoutItem.ts --------
-// Loadout item representing a gadget.
-
-
-export class CorePlayer_GadgetLoadoutItem extends CorePlayer_ALoadoutItem {
-    constructor(
-        slot: mod.InventorySlots,
-        name: string,
-        public readonly gadget: mod.Gadgets
-    ) {
-        super(slot, name)
-    }
-}
-
-// -------- FILE: src\Core\Player\Components\Loadout\IPlayerLoadout.ts --------
-// Minimal loadout definition used by the core loadout component.
-export interface CorePlayer_IPlayerLoadout {
-    id: string
-    items: CorePlayer_ALoadoutItem[]
-}
-
-// -------- FILE: src\Core\Player\Components\Loadout\WeaponLoadoutItem.ts --------
-// Loadout item representing a weapon with optional attachments.
-export class CorePlayer_WeaponLoadoutItem extends CorePlayer_ALoadoutItem {
-    constructor(
-        slot: mod.InventorySlots,
-        name: string,
-        public readonly weapon: mod.Weapons,
-        public readonly attachments: mod.WeaponAttachments[]
-    ) {
-        super(slot, name)
-    }
-}
-
-// -------- FILE: src\Core\Player\Components\Loadout\LoadoutComponent.ts --------
-// Core gameplay component responsible for applying loadouts.
-// UI, grouping, and availability are external concerns.
-export class CorePlayer_LoadoutComponent implements CorePlayer_IComponent {
-    private ap!: CorePlayer_APlayer
-    private currentLoadout: CorePlayer_IPlayerLoadout | null = null
-
-    onAttach(ap: CorePlayer_APlayer): void {
-        this.ap = ap
-    }
-
-    onDetach(): void {}
-
-    applyLoadout(loadout: CorePlayer_IPlayerLoadout): void {
-        this.clearAllInventorySlots()
-
-        for (const item of loadout.items) {
-            this.applyItem(item)
-        }
-
-        this.currentLoadout = loadout
-    }
-
-    getCurrentLoadout(): CorePlayer_IPlayerLoadout | null {
-        return this.currentLoadout
-    }
-
-    // ----------------------------------
-    // Tested & trusted methods (unchanged)
-    // ----------------------------------
-
-    public clearAllInventorySlots(): void {
-        const slots: mod.InventorySlots[] = [
-            mod.InventorySlots.PrimaryWeapon,
-            mod.InventorySlots.SecondaryWeapon,
-            mod.InventorySlots.GadgetOne,
-            mod.InventorySlots.GadgetTwo,
-            mod.InventorySlots.Throwable,
-        ]
-
-        for (const slot of slots) {
-            mod.RemoveEquipment(this.ap.player, slot)
-        }
-    }
-
-    private applyItem(item: CorePlayer_ALoadoutItem): void {
-        if (item instanceof CorePlayer_WeaponLoadoutItem) {
-            const wp = mod.CreateNewWeaponPackage()
-
-            for (const att of item.attachments) {
-                mod.AddAttachmentToWeaponPackage(att, wp)
-            }
-
-            mod.AddEquipment(this.ap.player, item.weapon, wp, item.slot)
-        } else if (item instanceof CorePlayer_GadgetLoadoutItem) {
-            mod.AddEquipment(this.ap.player, item.gadget, item.slot)
-        }
-    }
-}
-
-// -------- FILE: src\GameModes\Pressure\Player\LoadoutsRegistry.ts --------
-export const enum LoadoutIdMap {
-    Assault_Operator = 'assault.operator',
-    Assault_Elite = 'assault.elite',
-    Support_Operator = 'support.operator',
-    Support_Elite = 'support.elite',
-    Rifleman_Operator = 'rifleman.operator',
-    Rifleman_Elite = 'rifleman.elite',
-    Sniper_Operator = 'sniper.operator',
-    Sniper_Elite = 'sniper.elite',
-}
-
-export class LoadoutsRegistry {
-    private static readonly loadouts: readonly CorePlayer_IPlayerLoadout[] = [
-        // --------------------------------------------------
-        // Assault Operator
-        // --------------------------------------------------
-        {
-            id: LoadoutIdMap.Assault_Operator,
-            items: [
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.PrimaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.AssaultRifle_L85A3,
-                    mod.Weapons.AssaultRifle_L85A3,
-                    [
-                        mod.WeaponAttachments.Scope_SDO_350x,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_518mm_Factory,
-                        mod.WeaponAttachments.Magazine_30rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.SecondaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.SMG_PW7A2,
-                    mod.Weapons.SMG_PW7A2,
-                    [
-                        mod.WeaponAttachments.Scope_RO_M_175x,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_180mm_Standard,
-                        mod.WeaponAttachments.Magazine_30rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_GadgetLoadoutItem(
-                    mod.InventorySlots.GadgetOne,
-                    mod.stringkeys.gamemodes.PRSR.loadout.gadgets.Launcher_High_Explosive,
-                    mod.Gadgets.Launcher_High_Explosive
-                ),
-            ],
-        },
-
-        // --------------------------------------------------
-        // Assault Elite
-        // --------------------------------------------------
-        {
-            id: LoadoutIdMap.Assault_Elite,
-            items: [
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.PrimaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.AssaultRifle_SOR_556_Mk2,
-                    mod.Weapons.AssaultRifle_SOR_556_Mk2,
-                    [
-                        mod.WeaponAttachments.Scope_PVQ_31_400x,
-                        mod.WeaponAttachments.Muzzle_Standard_Suppressor,
-                        mod.WeaponAttachments.Barrel_IAR_Heavy,
-                        mod.WeaponAttachments.Bottom_Slim_Angled,
-                        mod.WeaponAttachments.Magazine_30rnd_Fast_Mag,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.SecondaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.SMG_SGX,
-                    mod.Weapons.SMG_SGX,
-                    [
-                        mod.WeaponAttachments.Scope_SU_231_150x,
-                        mod.WeaponAttachments.Top_5_mW_Red,
-                        mod.WeaponAttachments.Right_Flashlight,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_6_Fluted,
-                        mod.WeaponAttachments.Magazine_41rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_GadgetLoadoutItem(
-                    mod.InventorySlots.GadgetOne,
-                    mod.stringkeys.gamemodes.PRSR.loadout.gadgets.Launcher_High_Explosive,
-                    mod.Gadgets.Launcher_High_Explosive
-                ),
-            ],
-        },
-
-        // --------------------------------------------------
-        // Support Operator
-        // --------------------------------------------------
-        {
-            id: LoadoutIdMap.Support_Operator,
-            items: [
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.PrimaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.LMG_L110,
-                    mod.Weapons.LMG_L110,
-                    [
-                        mod.WeaponAttachments.Scope_R4T_200x,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_349mm_SB,
-                        mod.WeaponAttachments.Bottom_Bipod,
-                        mod.WeaponAttachments.Magazine_100rnd_Belt_Pouch,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.SecondaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.Shotgun_M87A1,
-                    mod.Weapons.Shotgun_M87A1,
-                    [
-                        mod.WeaponAttachments.Scope_Iron_Sights,
-                        mod.WeaponAttachments.Barrel_20_Factory,
-                        mod.WeaponAttachments.Magazine_7_Shell_Tube,
-                        mod.WeaponAttachments.Ammo_Buckshot,
-                    ]
-                ),
-                new CorePlayer_GadgetLoadoutItem(
-                    mod.InventorySlots.Throwable,
-                    mod.stringkeys.gamemodes.PRSR.loadout.gadgets.Throwable_Smoke_Grenade,
-                    mod.Gadgets.Throwable_Smoke_Grenade
-                ),
-            ],
-        },
-
-        // --------------------------------------------------
-        // Support Elite
-        // --------------------------------------------------
-        {
-            id: LoadoutIdMap.Support_Elite,
-            items: [
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.PrimaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.LMG_M240L,
-                    mod.Weapons.LMG_M240L,
-                    [
-                        mod.WeaponAttachments.Scope_SU_231_150x,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_20_OH,
-                        mod.WeaponAttachments.Bottom_Bipod,
-                        mod.WeaponAttachments.Magazine_75rnd_Belt_Box,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.SecondaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.Shotgun_M1014,
-                    mod.Weapons.Shotgun_M1014,
-                    [
-                        mod.WeaponAttachments.Scope_SU_231_150x,
-                        mod.WeaponAttachments.Barrel_185_Factory,
-                        mod.WeaponAttachments.Bottom_Slim_Angled,
-                        mod.WeaponAttachments.Magazine_6_Shell_Tube,
-                        mod.WeaponAttachments.Ammo_Buckshot,
-                    ]
-                ),
-                new CorePlayer_GadgetLoadoutItem(
-                    mod.InventorySlots.Throwable,
-                    mod.stringkeys.gamemodes.PRSR.loadout.gadgets.Throwable_Smoke_Grenade,
-                    mod.Gadgets.Throwable_Smoke_Grenade
-                ),
-            ],
-        },
-
-        // --------------------------------------------------
-        // Rifleman Operator
-        // --------------------------------------------------
-        {
-            id: LoadoutIdMap.Rifleman_Operator,
-            items: [
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.PrimaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.DMR_M39_EMR,
-                    mod.Weapons.DMR_M39_EMR,
-                    [
-                        mod.WeaponAttachments.Scope_PVQ_31_400x,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_18_EBR,
-                        mod.WeaponAttachments.Magazine_20rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.SecondaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.Carbine_M4A1,
-                    mod.Weapons.Carbine_M4A1,
-                    [
-                        mod.WeaponAttachments.Scope_SU_231_150x,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_115_Commando,
-                        mod.WeaponAttachments.Magazine_30rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_GadgetLoadoutItem(
-                    mod.InventorySlots.Throwable,
-                    mod.stringkeys.gamemodes.PRSR.loadout.gadgets.Throwable_Stun_Grenade,
-                    mod.Gadgets.Throwable_Stun_Grenade
-                ),
-            ],
-        },
-
-        // --------------------------------------------------
-        // Rifleman Elite
-        // --------------------------------------------------
-        {
-            id: LoadoutIdMap.Rifleman_Elite,
-            items: [
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.PrimaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.DMR_SVDM,
-                    mod.Weapons.DMR_SVDM,
-                    [
-                        mod.WeaponAttachments.Scope_PVQ_31_400x,
-                        mod.WeaponAttachments.Top_5_mW_Red,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_550mm_Factory,
-                        mod.WeaponAttachments.Bottom_Slim_Angled,
-                        mod.WeaponAttachments.Magazine_10rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.SecondaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.Carbine_GRT_BC,
-                    mod.Weapons.Carbine_GRT_BC,
-                    [
-                        mod.WeaponAttachments.Scope_SU_231_150x,
-                        mod.WeaponAttachments.Right_Flashlight,
-                        mod.WeaponAttachments.Muzzle_Flash_Hider,
-                        mod.WeaponAttachments.Barrel_145_Alt,
-                        mod.WeaponAttachments.Magazine_40rnd_Fast_Mag,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_GadgetLoadoutItem(
-                    mod.InventorySlots.Throwable,
-                    mod.stringkeys.gamemodes.PRSR.loadout.gadgets.Throwable_Stun_Grenade,
-                    mod.Gadgets.Throwable_Stun_Grenade
-                ),
-            ],
-        },
-
-        // --------------------------------------------------
-        // Sniper Operator
-        // --------------------------------------------------
-        {
-            id: LoadoutIdMap.Sniper_Operator,
-            items: [
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.PrimaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.Sniper_M2010_ESR,
-                    mod.Weapons.Sniper_M2010_ESR,
-                    [
-                        mod.WeaponAttachments.Scope_S_VPS_600x,
-                        mod.WeaponAttachments.Muzzle_Single_port_Brake,
-                        mod.WeaponAttachments.Barrel_24_Fluted,
-                        mod.WeaponAttachments.Magazine_5rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.SecondaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.Sidearm_M45A1,
-                    mod.Weapons.Sidearm_M45A1,
-                    [
-                        mod.WeaponAttachments.Scope_Iron_Sights,
-                        mod.WeaponAttachments.Barrel_5_Factory,
-                        mod.WeaponAttachments.Magazine_7rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_GadgetLoadoutItem(
-                    mod.InventorySlots.GadgetOne,
-                    mod.stringkeys.gamemodes.PRSR.loadout.gadgets.Misc_Sniper_Decoy,
-                    mod.Gadgets.Misc_Sniper_Decoy
-                ),
-            ],
-        },
-
-        // --------------------------------------------------
-        // Sniper Elite
-        // --------------------------------------------------
-        {
-            id: LoadoutIdMap.Sniper_Elite,
-            items: [
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.PrimaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.Sniper_PSR,
-                    mod.Weapons.Sniper_PSR,
-                    [
-                        mod.WeaponAttachments.Scope_NFX_800x,
-                        mod.WeaponAttachments.Top_5_mW_Red,
-                        mod.WeaponAttachments.Muzzle_Double_port_Brake,
-                        mod.WeaponAttachments.Barrel_27_MK22,
-                        mod.WeaponAttachments.Bottom_Bipod,
-                        mod.WeaponAttachments.Magazine_10rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_WeaponLoadoutItem(
-                    mod.InventorySlots.SecondaryWeapon,
-                    mod.stringkeys.gamemodes.PRSR.loadout.weapons.Sidearm_P18,
-                    mod.Weapons.Sidearm_P18,
-                    [
-                        mod.WeaponAttachments.Scope_Mini_Flex_100x,
-                        mod.WeaponAttachments.Barrel_39_Factory,
-                        mod.WeaponAttachments.Top_5_mW_Red,
-                        mod.WeaponAttachments.Magazine_17rnd_Magazine,
-                        mod.WeaponAttachments.Ammo_FMJ,
-                    ]
-                ),
-                new CorePlayer_GadgetLoadoutItem(
-                    mod.InventorySlots.GadgetOne,
-                    mod.stringkeys.gamemodes.PRSR.loadout.gadgets.Misc_Sniper_Decoy,
-                    mod.Gadgets.Misc_Sniper_Decoy
-                ),
-            ],
-        },
-    ]
-
-    static getAll(): readonly CorePlayer_IPlayerLoadout[] {
-        return this.loadouts
-    }
-
-    static getById(id: LoadoutIdMap): CorePlayer_IPlayerLoadout | null {
-        for (const loadout of this.loadouts) {
-            if (loadout.id === id) {
-                return loadout
-            }
-        }
-        return null
-    }
-}
-
-// -------- FILE: src\GameModes\Pressure\Player\Player.ts --------
-export class Player extends CorePlayer_APlayer {
-    loadoutComp: CorePlayer_LoadoutComponent
-    protectionComp: CorePlayer_ProtectionComponent
-    battleStatsComp: CorePlayer_BattleStatsComponent
-
-    constructor(player: mod.Player) {
-        super(player)
-
-        this.loadoutComp = new CorePlayer_LoadoutComponent()
-        this.addComponent(this.loadoutComp)
-
-        this.protectionComp = new CorePlayer_ProtectionComponent()
-        this.addComponent(this.protectionComp)
-
-        this.battleStatsComp = new CorePlayer_BattleStatsComponent()
-        this.addComponent(this.battleStatsComp)
-
-        // React explicitly to loadout selection
-        /* this.loadoutComp.onLoadoutSelected(() => {
-            if (this.deployReturnPos) {
-                mod.Teleport(this.player, this.deployReturnPos, 0)
-                this.deployReturnPos = null
-            }
-
-            this.loadoutComp.hideDeployUI()
-            this.protectionComp.activate(5)
-        }) */
-
-        this.addListener({
-            OnPlayerDeployed: () => {
-                // Default Loadout
-                const ids = [
-                    LoadoutIdMap.Assault_Operator,
-                    LoadoutIdMap.Support_Operator,
-                    LoadoutIdMap.Rifleman_Operator,
-                    LoadoutIdMap.Sniper_Operator,
-                ]
-
-                const randomId = ids[Math.floor(Math.random() * ids.length)]
-                const loadout = LoadoutsRegistry.getById(randomId)
-
-                if (loadout) {
-                    this.loadoutComp.applyLoadout(loadout)
-                }
-
-                // Spawn protection
-                this.protectionComp.activate(5)
-
-                // Stats
-                this.battleStatsComp.clearKillStreak()
-
-                // BUG: no effect at all
-                // mod.SkipManDown(this.player, true)
-
-                // mod.SetPlayerMovementSpeedMultiplier(this.player, 2)
-
-                /*
-                // VO Testing
-                mod.Wait(3).then(() => {
-                    mod.DisplayHighlightedWorldLogMessage(mod.Message(132))
-                    mod.PlayVO(
-                        mod.SpawnObject(
-                            mod.RuntimeSpawn_Common.SFX_VOModule_OneShot2D,
-                            mod.CreateVector(0, 0, 0),
-                            mod.CreateVector(0, 0, 0)
-                        ),
-                        // mod.VoiceOverEvents2D.ObjectiveCaptured, // we own objective Golf
-                        // mod.VoiceOverEvents2D.ObjectiveCapturedEnemy, // hostiles now control objective Golf
-                        // mod.VoiceOverEvents2D.ObjectiveCapturedEnemyGeneric, // BUG: silence
-                        // mod.VoiceOverEvents2D.ObjectiveCapturedGeneric, // BUG: silence
-                        // mod.VoiceOverEvents2D.ObjectiveCapturing, // BUG: securing ALPHA (always)
-                        // mod.VoiceOverEvents2D.ObjectiveContested, // hostiles are attacking Golf
-                        // mod.VoiceOverEvents2D.ObjectiveLocated, // new objective located
-                        // mod.VoiceOverEvents2D.ObjectiveLockdownEnemy, // Golf has been locked down by the enemy
-                        // mod.VoiceOverEvents2D.ObjectiveLockdownFriendly, // our forces have locked down Golf
-                        // mod.VoiceOverEvents2D.ObjectiveLost, // we've lost control of the objective Golf
-                        // mod.VoiceOverEvents2D.ObjectiveNeutralised, // our forces neutralized Golf
-                        mod.VoiceOverEvents2D.SectorTakenAttacker, // attack successful. we've taken enemy sector
-                        mod.VoiceOverFlags.Golf
-                    )
-                }) */
-            },
-
-            OnPlayerDied: () => {
-                this.battleStatsComp.addDeath()
-
-                mod.Wait(0.1).then(() => {
-                    mod.Kill(this.player)
-                })
-            },
-
-            OnPlayerEarnedKill: (
-                eventOtherPlayer,
-                eventDeathType,
-                eventWeaponUnlock
-            ) => {
-                if (!eventOtherPlayer) {
-                    return
-                }
-
-                if (
-                    mod.Equals(
-                        mod.GetTeam(this.player),
-                        mod.GetTeam(eventOtherPlayer.player)
-                    )
-                ) {
-                    if (!mod.Equals(this.player, eventOtherPlayer.player)) {
-                        this.battleStatsComp.addTeamKill()
-                    }
-                } else {
-                    this.battleStatsComp.addKill()
-                    this.battleStatsComp.addKillStreak()
-                    this.battleStatsComp.addScore(
-                        100 + (this.battleStatsComp.getKillStreak() - 1) * 10
-                    )
-                }
-            },
-
-            /* OnPlayerUndeploy: () => {
-                mod.SetTeam(
-                    this.player,
-                    this.teamId === 1 ? mod.GetTeam(2) : mod.GetTeam(1)
-                )
-            }, */
-
-            OnPlayerInteract: (eventInteractPoint) => {
-                const ids = [
-                    LoadoutIdMap.Assault_Elite,
-                    LoadoutIdMap.Support_Elite,
-                    LoadoutIdMap.Rifleman_Elite,
-                    LoadoutIdMap.Sniper_Elite,
-                ]
-                const randomId = ids[Math.floor(Math.random() * ids.length)]
-
-                const loadout = LoadoutsRegistry.getById(randomId)
-
-                if (loadout) {
-                    this.loadoutComp.applyLoadout(loadout)
-
-                    mod.ForceSwitchInventory(
-                        this.player,
-                        mod.InventorySlots.PrimaryWeapon
-                    )
-                }
-            },
-
-            OngoingPlayer: () => {
-                if (!mod.IsPlayerValid(this.player)) {
-                    return
-                }
-
-                mod.SetScoreboardPlayerValues(
-                    this.player,
-                    this.battleStatsComp.getScore(),
-                    this.battleStatsComp.getKills(),
-                    this.battleStatsComp.getDeaths(),
-                    this.battleStatsComp.getTeamKills(),
-                    this.battleStatsComp.getKillStreak()
-                )
-
-                if (
-                    mod.GetSoldierState(
-                        this.player,
-                        mod.SoldierStateBool.IsAlive
-                    ) &&
-                    mod.GetSoldierState(
-                        this.player,
-                        mod.SoldierStateBool.IsFiring
-                    )
-                ) {
-                    if (
-                        mod.IsInventorySlotActive(
-                            this.player,
-                            mod.InventorySlots.ClassGadget
-                        ) &&
-                        mod.HasEquipment(
-                            this.player,
-                            mod.Gadgets.Class_Adrenaline_Injector
-                        )
-                    ) {
-                        mod.Wait(1).then(() => {
-                            mod.Heal(this.player, 100)
-                        })
-                    }
-                }
-            },
-        })
-    }
-}
-
-// -------- FILE: src\GameModes\Pressure\Player\PlayerManager.ts --------
-export class PlayerManager extends CorePlayer_APlayerManager {
-    constructor() {
-        super(Player)
-    }
-}
-
 // -------- FILE: src\Core\AI\Modules\Memory\MemoryManager.ts --------
 /**
  * CoreAI_MemoryManager:
@@ -2513,12 +1734,11 @@ export class PlayerManager extends CorePlayer_APlayerManager {
 
 export type CoreAI_MemoryFields = {
     closestEnemy: mod.Player | null
-
-    damagedBy: mod.Player | null
-    isFiring: boolean
-
-    moveToPos: mod.Vector | null // movement target
+    vehicleToDrive: mod.Vehicle | null
+    isInBattle: boolean
+    roamPos: mod.Vector | null // movement target
     arrivedPos: mod.Vector | null // semantic arrival
+    capturePoint: mod.CapturePoint | null
 }
 
 export class CoreAI_MemoryManager {
@@ -2528,12 +1748,11 @@ export class CoreAI_MemoryManager {
     /** All memory values live here */
     public data: CoreAI_MemoryFields = {
         closestEnemy: null,
-
-        damagedBy: null,
-        isFiring: false,
-
-        moveToPos: null,
+        vehicleToDrive: null,
+        isInBattle: false,
+        roamPos: null,
         arrivedPos: null,
+        capturePoint: null,
     }
 
     /** TTL expiration registry */
@@ -2624,12 +1843,11 @@ export class CoreAI_MemoryManager {
 
         this.data = {
             closestEnemy: null,
-
-            damagedBy: null,
-            isFiring: false,
-
-            moveToPos: null,
+            vehicleToDrive: null,
+            isInBattle: false,
+            roamPos: null,
             arrivedPos: null,
+            capturePoint: null,
         }
 
         this.expirations.clear()
@@ -2716,6 +1934,12 @@ export abstract class CoreAI_ASensor {
         eventOtherPlayer: mod.Player,
         eventDamageType: mod.DamageType,
         eventWeaponUnlock: mod.WeaponUnlock
+    ): void {}
+
+    onRayCastHit?(
+        ctx: CoreAI_SensorContext,
+        eventPoint: mod.Vector,
+        eventNormal: mod.Vector
     ): void {}
 
     reset(): void {
@@ -2813,7 +2037,7 @@ export abstract class CoreAI_ABehavior {
     public abstract name: string
 
     // Throttling interval. Zero means no throttling.
-    protected intervalMs: number = 5000
+    protected intervalMs: number = 1000
 
     private lastUpdateTime: number = 0
 
@@ -2855,8 +2079,9 @@ export class CoreAI_IdleBehavior extends CoreAI_ABehavior {
 
     override enter(): void {
         const player = this.brain.player
+
         if (mod.IsPlayerValid(player)) {
-            // mod.AIIdleBehavior(player)
+            mod.AIIdleBehavior(player)
         }
     }
 
@@ -2872,6 +2097,8 @@ export class CoreAI_IdleBehavior extends CoreAI_ABehavior {
 
 // -------- FILE: src\Core\AI\Modules\Behavior\BehaviorController.ts --------
 // src/Core/AI/Modules/Behavior/BehaviorController.ts
+export type CoreAI_BehaviorMode = 'onFoot' | 'onDrive'
+
 /**
  * BehaviorController:
  *
@@ -2884,6 +2111,7 @@ export class CoreAI_IdleBehavior extends CoreAI_ABehavior {
  * - Behaviors do NOT decide completion.
  * - Switching happens every tick based on scoring.
  */
+
 export class CoreAI_BehaviorController {
     private current: CoreAI_ABehavior
 
@@ -2931,6 +2159,203 @@ export class CoreAI_BehaviorController {
     }
 }
 
+// -------- FILE: src\Core\AI\Modules\Task\ITaskScoringEntry.ts --------
+// src/Core/AI/Modules/Task/ITaskScoringEntry.ts
+/**
+ * CoreAI_ITaskScoringEntry:
+ * - score(brain): returns utility score for this behavior.
+ * - factory(brain): creates a ready-to-run behavior instance.
+ *
+ * TaskSelector:
+ * - picks the entry with highest score
+ * - calls factory(brain) to get the behavior instance
+ */
+export interface CoreAI_ITaskScoringEntry {
+    score: (brain: CoreAI_Brain) => number
+    factory: (brain: CoreAI_Brain) => CoreAI_ABehavior
+}
+
+// -------- FILE: src\Core\AI\Profiles\AProfile.ts --------
+/**
+ * CoreAI_AProfile:
+ * Base AI profile.
+ *
+ * Contains:
+ *  - scoring: list of behavior scoring entries
+ *  - sensors: list of sensor factory functions
+ *
+ * Each sensor factory returns a new sensor instance:
+ *    () => new SomeSensor(...)
+ *
+ * This ensures every AI brain receives fresh, isolated sensors.
+ */
+export abstract class CoreAI_AProfile {
+    /** Task scoring table for behaviors. */
+    scoring: CoreAI_ITaskScoringEntry[] = []
+
+    /** Sensor factories. Each returns a new CoreAI_ASensor instance. */
+    sensors: (() => CoreAI_ASensor)[] = []
+
+    protected addSensorIf(
+        condition: unknown,
+        factory: () => CoreAI_ASensor
+    ): void {
+        if (condition) {
+            this.sensors.push(factory)
+        }
+    }
+}
+
+export interface CoreAI_FightSensorOptions {
+    intervalMs?: number
+    ttlMs?: number
+}
+
+export interface CoreAI_ClosestEnemySensorOptions {
+    sensitivity?: number
+    intervalMs?: number
+    ttlMs?: number
+}
+
+export interface CoreAI_VehicleToDriveSensorOptions {
+    intervalMs?: number
+    radius?: number
+    ttlMs?: number
+}
+
+export interface CoreAI_ArrivalSensorOptions {
+    getWPs?: () => mod.Vector[]
+    intervalMs?: number
+    distanceThreshold?: number
+    ttlMs?: number
+    cooldownMs?: number
+}
+
+export interface CoreAI_MoveToSensorOptions {
+    getWPs?: () => mod.Vector[]
+    intervalMs?: number
+    ttlMs?: number
+}
+
+export interface CoreAI_CapturePointSensorOptions {
+    getCapturePoints?: () => mod.CapturePoint[]
+    intervalMs?: number
+    ttlMs?: number
+}
+
+export interface CoreAI_SensorOptions {
+    fightSensor?: CoreAI_FightSensorOptions
+    closestEnemySensor?: CoreAI_ClosestEnemySensorOptions
+    vehicleToDriveSensor?: CoreAI_VehicleToDriveSensorOptions
+    arrivalSensor?: CoreAI_ArrivalSensorOptions
+    roamSensor?: CoreAI_MoveToSensorOptions
+    onDriveMoveToSensor?: CoreAI_MoveToSensorOptions
+    capturePointSensor?: CoreAI_CapturePointSensorOptions
+    moveToCapturePointSensor?: CoreAI_CapturePointSensorOptions
+}
+
+// -------- FILE: src\Core\AI\Modules\Behavior\Behaviors\MoveToBehavior.ts --------
+/**
+ * MoveToBehavior:
+ * - Starts movement in enter()
+ * - Runs as long as memory.roamPos exists
+ * - Stopped automatically when TTL clears roamPos
+ * - Optional target enables AISetTarget during movement
+ * - Mode selects on-foot or driver logic (never both)
+ *
+ * TTL-driven memory replaces durationMs logic.
+ */
+export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
+    public name = 'moveto'
+
+    private roamPos: mod.Vector
+    private readonly speed: mod.MoveSpeed
+    private readonly mode: CoreAI_BehaviorMode
+    private readonly arrivalDist: number
+    private readonly isValidated: boolean
+
+    constructor(
+        brain: CoreAI_Brain,
+        pos: mod.Vector,
+        speed: mod.MoveSpeed = mod.MoveSpeed.Run,
+        mode: CoreAI_BehaviorMode = 'onFoot',
+        arrivalDist: number = 3,
+        isValidated: boolean = true
+    ) {
+        super(brain)
+        this.roamPos = pos
+        this.speed = speed
+        this.mode = mode
+        this.arrivalDist = arrivalDist
+        this.isValidated = isValidated
+    }
+
+    public getTargetPos(): mod.Vector {
+        return this.roamPos
+    }
+
+    override enter(): void {
+        const player = this.brain.player
+        if (!mod.IsPlayerValid(player)) {
+            return
+        }
+
+        if (this.mode === 'onDrive') {
+            this.enterOnDriveMove(player)
+            return
+        }
+
+        this.enterOnFootMove(player)
+    }
+
+    private async enterOnDriveMove(player: mod.Player): Promise<void> {
+        const vehicle = mod.GetVehicleFromPlayer(player)
+
+        mod.ForcePlayerExitVehicle(player, vehicle)
+        await mod.Wait(0)
+        await mod.Wait(0)
+        mod.ForcePlayerToSeat(player, vehicle, 0)
+        mod.AISetMoveSpeed(player, mod.MoveSpeed.Sprint)
+        // mod.AIBattlefieldBehavior(player)
+        mod.AIDefendPositionBehavior(player, this.roamPos, 0, 4)
+        // mod.AIValidatedMoveToBehavior(player, this.targetPos)
+    }
+
+    private enterOnFootMove(player: mod.Player): void {
+        mod.AISetMoveSpeed(player, this.speed)
+        this.isValidated
+            ? mod.AIValidatedMoveToBehavior(player, this.roamPos)
+            : mod.AIMoveToBehavior(player, this.roamPos)
+    }
+
+    override update(): void {
+        const player = this.brain.player
+        if (!mod.IsPlayerValid(player)) return
+
+        const memPos = this.brain.memory.get('roamPos')
+        if (!memPos) return
+
+        /*
+        // Conflicts with other Scores
+        if (!mod.Equals(memPos, this.roamPos)) {
+            this.roamPos = memPos
+            this.enter()
+        } */
+
+        const myPos = mod.GetObjectPosition(player)
+        const dist = mod.DistanceBetween(myPos, this.roamPos)
+        const arrivalDist = this.arrivalDist
+
+        if (dist < arrivalDist) {
+            this.brain.memory.set('roamPos', null)
+        }
+    }
+
+    override exit(): void {
+        // No target cleanup here; targeting is managed by the brain.
+    }
+}
+
 // -------- FILE: src\Core\AI\Modules\Task\TaskSelector.ts --------
 export class CoreAI_TaskSelector {
     private brain: CoreAI_Brain
@@ -2952,7 +2377,8 @@ export class CoreAI_TaskSelector {
         let bestScore = -Infinity
 
         // Evaluate profile scoring
-        for (const entry of this.profile.scoring) {
+        for (let i = 0; i < this.profile.scoring.length; i++) {
+            const entry = this.profile.scoring[i]
             const score = entry.score(this.brain)
             if (score > bestScore) {
                 bestScore = score
@@ -2972,13 +2398,24 @@ export class CoreAI_TaskSelector {
         const temp = bestEntry.factory(this.brain)
         const nextClass = temp.constructor
 
-        // If same class -> never switch (no restarts)
+        // If same class -> don't switch (no restarts), except MoveTo when target changes.
         if (current && current.constructor === nextClass) {
-            return current
+            if (
+                current instanceof CoreAI_MoveToBehavior &&
+                temp instanceof CoreAI_MoveToBehavior
+            ) {
+                const currentPos = current.getTargetPos()
+                const nextPos = temp.getTargetPos()
+                if (mod.DistanceBetween(currentPos, nextPos) <= 0) {
+                    return current
+                }
+            } else {
+                return current
+            }
         }
 
-        // Switch to new class
-        return bestEntry.factory(this.brain)
+        // Switch to new instance
+        return temp
     }
 }
 
@@ -3010,149 +2447,215 @@ export const CoreUI_Colors = {
 }
 
 // -------- FILE: src\Core\AI\Modules\Debug\DebugWI.ts --------
+// @stringkeys core.ai.debug.brain.memory: closestEnemy {}, vehicleToDrive {}, isInBattle {}, roamPos {}, arrivedPos {}
+
+// @stringkeys core.ai.debug.brain.behaviors: fight, defend, idle, moveto, entervehicle
+
 export interface CoreAI_IDebugWI {
     index: number
     worldIcon: mod.WorldIcon
 }
 
 export class CoreAI_DebugWI {
-    private behavior: CoreAI_IDebugWI
+    /* private behavior: CoreAI_IDebugWI
     private stats: CoreAI_IDebugWI
     private battle: CoreAI_IDebugWI
-    private calm: CoreAI_IDebugWI
+    private calm: CoreAI_IDebugWI */
 
-    private moveTo: mod.WorldIcon
+    private receiver: mod.Player
+    private brain: CoreAI_Brain
 
-    constructor(private player: mod.Player, private brain: CoreAI_Brain) {
-        this.calm = { index: 3, worldIcon: this.spawnWI(player) }
-        this.battle = { index: 2, worldIcon: this.spawnWI(player) }
-        this.stats = { index: 1, worldIcon: this.spawnWI(player) }
-        this.behavior = { index: 0, worldIcon: this.spawnWI(player) }
+    private behaviorWI: mod.WorldIcon
+    private behaviorColorsMap: Map<string, mod.Vector> = new Map([
+        ['fight', mod.CreateVector(1, 0, 0)],
+        ['defend', mod.CreateVector(1, 1, 0)],
+        ['idle', mod.CreateVector(1, 1, 1)],
+        ['moveto', mod.CreateVector(0, 1, 1)],
+        ['entervehicle', mod.CreateVector(0, 1, 0)],
+    ])
 
-        this.moveTo = mod.SpawnObject(
+    private roamPosWI: mod.WorldIcon
+    private vehicleToDriveWI: mod.WorldIcon
+
+    private memoryWIs: Map<keyof CoreAI_MemoryFields, mod.WorldIcon> = new Map()
+
+    constructor(receiver: mod.Player, brain: CoreAI_Brain) {
+        this.receiver = receiver
+        this.brain = brain
+
+        this.behaviorWI = mod.SpawnObject(
             mod.RuntimeSpawn_Common.WorldIcon,
-            mod.GetObjectPosition(mod.GetHQ(2)),
+            mod.CreateVector(0, 0, 0),
             mod.CreateVector(0, 0, 0)
         )
-        mod.SetWorldIconOwner(this.moveTo, player)
-        mod.SetWorldIconImage(this.moveTo, mod.WorldIconImages.Skull)
-        mod.EnableWorldIconImage(this.moveTo, true)
-        mod.SetWorldIconColor(this.moveTo, CoreUI_Colors.YellowDark)
+        mod.SetWorldIconOwner(this.behaviorWI, receiver)
+
+        let i = 1
+        for (const key of Object.keys(this.brain.memory.data) as Array<
+            keyof typeof this.brain.memory.data
+        >) {
+            const wi = mod.SpawnObject(
+                mod.RuntimeSpawn_Common.WorldIcon,
+                mod.CreateVector(0, 0, 0),
+                mod.CreateVector(0, 0, 0)
+            )
+            mod.SetWorldIconOwner(wi, receiver)
+
+            this.memoryWIs.set(key, wi)
+            i++
+        }
+
+        this.roamPosWI = mod.SpawnObject(
+            mod.RuntimeSpawn_Common.WorldIcon,
+            mod.CreateVector(0, 0, 0),
+            mod.CreateVector(0, 0, 0)
+        )
+        mod.SetWorldIconOwner(this.roamPosWI, receiver)
+        mod.SetWorldIconImage(this.roamPosWI, mod.WorldIconImages.Flag)
+        mod.EnableWorldIconImage(this.roamPosWI, true)
+        mod.SetWorldIconColor(this.roamPosWI, mod.CreateVector(0, 1, 1))
+
+        this.vehicleToDriveWI = mod.SpawnObject(
+            mod.RuntimeSpawn_Common.WorldIcon,
+            mod.CreateVector(0, 0, 0),
+            mod.CreateVector(0, 0, 0)
+        )
+        mod.SetWorldIconOwner(this.vehicleToDriveWI, receiver)
+        mod.SetWorldIconImage(this.vehicleToDriveWI, mod.WorldIconImages.Assist)
+        mod.EnableWorldIconImage(this.vehicleToDriveWI, true)
+        mod.SetWorldIconColor(this.vehicleToDriveWI, mod.CreateVector(1, 1, 0))
     }
 
     update() {
-        if (this.brain.memory.get('moveToPos')) {
-            mod.SetWorldIconPosition(
-                this.moveTo,
-                this.brain.memory.get('moveToPos')!
-            )
-            mod.EnableWorldIconImage(this.moveTo, true)
-        } else {
-            mod.EnableWorldIconImage(this.moveTo, false)
-        }
-
-        if (
-            !mod.IsPlayerValid(this.brain.player) ||
-            !mod.GetSoldierState(
-                this.brain.player,
-                mod.SoldierStateBool.IsAlive
-            )
-        ) {
-            mod.EnableWorldIconText(this.behavior.worldIcon, false)
-            mod.EnableWorldIconText(this.stats.worldIcon, false)
-            mod.EnableWorldIconText(this.battle.worldIcon, false)
-            mod.EnableWorldIconText(this.calm.worldIcon, false)
-            return
-        }
-
-        mod.EnableWorldIconText(this.behavior.worldIcon, true)
-        mod.EnableWorldIconText(this.stats.worldIcon, true)
-        mod.EnableWorldIconText(this.battle.worldIcon, true)
-        mod.EnableWorldIconText(this.calm.worldIcon, true)
-
-        // @stringkeys core.ai.debug.brain.behaviors: fight, defend, idle, moveto
+        const isValid =
+            mod.IsPlayerValid(this.brain.player) &&
+            mod.GetSoldierState(this.brain.player, mod.SoldierStateBool.IsAlive)
 
         /**
          * Behavior
          */
-        this.updateWI(
-            this.behavior,
-            mod.Message(
-                `core.ai.debug.brain.behaviors.${
-                    this.brain.behaviorController.currentBehavior().name
-                }`
+        if (isValid) {
+            mod.EnableWorldIconText(this.behaviorWI, true)
+            mod.SetWorldIconPosition(
+                this.behaviorWI,
+                mod.CreateVector(
+                    mod.XComponentOf(mod.GetObjectPosition(this.brain.player)),
+                    mod.YComponentOf(mod.GetObjectPosition(this.brain.player)) +
+                        this.getStackedIconOffset(
+                            mod.DistanceBetween(
+                                mod.GetObjectPosition(this.brain.player),
+                                mod.GetObjectPosition(this.receiver)
+                            ),
+                            0,
+                            0.6
+                        ),
+                    mod.ZComponentOf(mod.GetObjectPosition(this.brain.player))
+                )
             )
-        )
-
-        // Behavior Colors
-        switch (this.brain.behaviorController.currentBehavior().name) {
-            case 'fight':
-                mod.SetWorldIconColor(
-                    this.behavior.worldIcon,
-                    mod.CreateVector(1, 0, 0)
+            mod.SetWorldIconText(
+                this.behaviorWI,
+                mod.Message(
+                    `core.ai.debug.brain.behaviors.${
+                        this.brain.behaviorController.currentBehavior().name
+                    }`
                 )
-                break
-            case 'defend':
-                mod.SetWorldIconColor(
-                    this.behavior.worldIcon,
-                    mod.CreateVector(0, 1, 1)
-                )
-                break
-            case 'moveto':
-                mod.SetWorldIconColor(
-                    this.behavior.worldIcon,
-                    mod.CreateVector(0, 1, 0)
-                )
-                break
-            case 'idle':
-                mod.SetWorldIconColor(
-                    this.behavior.worldIcon,
-                    mod.CreateVector(1, 1, 1)
-                )
-                break
+            )
+            mod.SetWorldIconColor(
+                this.behaviorWI,
+                this.behaviorColorsMap.get(
+                    this.brain.behaviorController.currentBehavior().name
+                )!
+            )
+        } else {
+            mod.EnableWorldIconText(this.behaviorWI, false)
         }
 
         /**
-         * Stats (distance + team)
+         * Memory
          */
-        this.updateWI(
-            this.stats,
-            mod.Message(
-                `core.ai.debug.brain.distance`,
-                Math.floor(
-                    mod.DistanceBetween(
-                        mod.GetObjectPosition(this.brain.player),
-                        mod.GetObjectPosition(this.player)
-                    )
-                ),
-                mod.GetObjId(mod.GetTeam(this.brain.player))
+        let i = 1
+        for (const [key, wi] of this.memoryWIs) {
+            if (!isValid) {
+                mod.EnableWorldIconText(wi, false)
+                continue
+            }
+
+            mod.SetWorldIconColor(
+                wi,
+                this.brain.memory.getTimeRemaining(key) === 0
+                    ? mod.CreateVector(1, 1, 1)
+                    : mod.CreateVector(1, 1, 0)
             )
-        )
+            mod.EnableWorldIconText(wi, true)
+            mod.SetWorldIconPosition(
+                wi,
+                mod.CreateVector(
+                    mod.XComponentOf(mod.GetObjectPosition(this.brain.player)),
+                    mod.YComponentOf(mod.GetObjectPosition(this.brain.player)) +
+                        this.getStackedIconOffset(
+                            mod.DistanceBetween(
+                                mod.GetObjectPosition(this.brain.player),
+                                mod.GetObjectPosition(this.receiver)
+                            ),
+                            i,
+                            0.6
+                        ),
+                    mod.ZComponentOf(mod.GetObjectPosition(this.brain.player))
+                )
+            )
+            mod.SetWorldIconText(
+                wi,
+                mod.Message(
+                    `core.ai.debug.brain.memory.${key}`,
+                    this.brain.memory.getTimeRemaining(key)
+                )
+            )
+
+            i++
+        }
 
         /**
-         * Battle Memory fields
+         * Roam navigation
          */
-        this.updateWI(
-            this.battle,
-            mod.Message(
-                `core.ai.debug.brain.memory.battle`,
-                this.brain.memory.getTimeRemaining('isFiring'),
-                this.brain.memory.getTimeRemaining('damagedBy'),
-                this.brain.memory.getTimeRemaining('closestEnemy')
+        if (this.brain.memory.get('roamPos')) {
+            mod.SetWorldIconPosition(
+                this.roamPosWI,
+                this.brain.memory.get('roamPos')!
             )
-        )
+            mod.EnableWorldIconImage(this.roamPosWI, true)
+            mod.SetWorldIconText(
+                this.roamPosWI,
+                mod.Message(this.brain.memory.getTimeRemaining('roamPos'))
+            )
+            mod.EnableWorldIconText(this.roamPosWI, true)
+        } else {
+            mod.EnableWorldIconImage(this.roamPosWI, false)
+            mod.EnableWorldIconText(this.roamPosWI, false)
+        }
 
         /**
-         * Calm Memory fields
+         * Vehicle to Drive navigation
          */
-        this.updateWI(
-            this.calm,
-            mod.Message(
-                `core.ai.debug.brain.memory.calm`,
-                this.brain.memory.getTimeRemaining('moveToPos'),
-                this.brain.memory.getTimeRemaining('arrivedPos')
+        if (this.brain.memory.get('vehicleToDrive')) {
+            mod.SetWorldIconPosition(
+                this.vehicleToDriveWI,
+                mod.GetVehicleState(
+                    this.brain.memory.get('vehicleToDrive')!,
+                    mod.VehicleStateVector.VehiclePosition
+                )
             )
-        )
+            mod.EnableWorldIconImage(this.vehicleToDriveWI, true)
+            mod.SetWorldIconText(
+                this.vehicleToDriveWI,
+                mod.Message(
+                    this.brain.memory.getTimeRemaining('vehicleToDrive')
+                )
+            )
+            mod.EnableWorldIconText(this.vehicleToDriveWI, true)
+        } else {
+            mod.EnableWorldIconImage(this.vehicleToDriveWI, false)
+            mod.EnableWorldIconText(this.vehicleToDriveWI, false)
+        }
     }
 
     private round2decimal(num: number): number {
@@ -3209,40 +2712,6 @@ export class CoreAI_DebugWI {
         // Each stacked icon sits on top of the previous one
         return baseOffset + index * gap * scale
     }
-
-    private spawnWI(receiver: mod.Player): mod.WorldIcon {
-        const wi = mod.SpawnObject(
-            mod.RuntimeSpawn_Common.WorldIcon,
-            mod.CreateVector(0, 0, 0),
-            mod.CreateVector(0, 0, 0)
-        )
-        mod.SetWorldIconOwner(wi, receiver)
-        mod.SetWorldIconColor(wi, mod.CreateVector(1, 1, 1))
-        mod.SetWorldIconText(wi, mod.Message(''))
-        mod.EnableWorldIconText(wi, true)
-
-        return wi
-    }
-
-    private updateWI(wi: CoreAI_IDebugWI, mes: mod.Message): void {
-        mod.SetWorldIconPosition(
-            wi.worldIcon,
-            mod.CreateVector(
-                mod.XComponentOf(mod.GetObjectPosition(this.brain.player)),
-                mod.YComponentOf(mod.GetObjectPosition(this.brain.player)) +
-                    this.getStackedIconOffset(
-                        mod.DistanceBetween(
-                            mod.GetObjectPosition(this.brain.player),
-                            mod.GetObjectPosition(this.player)
-                        ),
-                        wi.index,
-                        0.6
-                    ),
-                mod.ZComponentOf(mod.GetObjectPosition(this.brain.player))
-            )
-        )
-        mod.SetWorldIconText(wi.worldIcon, mes)
-    }
 }
 
 // -------- FILE: src\Core\AI\IBrainEvents.ts --------
@@ -3255,26 +2724,73 @@ export interface CoreAI_IBrainEvents {
 // -------- FILE: src\Core\AI\Modules\Perception\Sensors\FightSensor.ts --------
 /**
  * FightSensor:
- * Detects weapon firing.
+ * Detects combat by raycasting toward nearby enemies.
  *
  * Writes:
- * - memory.isFiring (TTL-based boolean)
+ * - memory.isInBattle (TTL-based boolean)
  *
  * Notes:
- * - Damage events are handled directly by the Brain.
+ * - OnRayCastHit is used to confirm nearby enemy presence.
  * - No POIs.
  * - No behaviors spawned.
- * - TaskSelector checks memory.isFiring to understand combat state.
+ * - TaskSelector checks memory.isInBattle to understand combat state.
  */
 export class CoreAI_FightSensor extends CoreAI_ASensor {
+    /* private targetWI: mod.WorldIcon
+    private startWI: mod.WorldIcon
+    private hitWI: mod.WorldIcon
+    private hitClosestEnemyWI: mod.WorldIcon */
+
+    private VEHICLE_OFFSET = 5.1
+
     constructor(
-        intervalMs: number = 50,
-        private readonly ttlMs: number = 5000
+        intervalMs: number = 500,
+        private readonly ttlMs: number = 10000
     ) {
         super(intervalMs)
+
+        /* this.targetWI = mod.SpawnObject(
+            mod.RuntimeSpawn_Common.WorldIcon,
+            mod.CreateVector(0, 0, 0),
+            mod.CreateVector(0, 0, 0)
+        )
+        mod.SetWorldIconOwner(this.targetWI, mod.GetTeam(1))
+        mod.SetWorldIconImage(this.targetWI, mod.WorldIconImages.Skull)
+        mod.SetWorldIconColor(this.targetWI, CoreUI_Colors.RedDark)
+
+        this.startWI = mod.SpawnObject(
+            mod.RuntimeSpawn_Common.WorldIcon,
+            mod.CreateVector(0, 0, 0),
+            mod.CreateVector(0, 0, 0)
+        )
+        mod.SetWorldIconOwner(this.startWI, mod.GetTeam(1))
+        mod.SetWorldIconImage(this.startWI, mod.WorldIconImages.Cross)
+        mod.SetWorldIconColor(this.startWI, CoreUI_Colors.RedDark)
+
+        this.hitWI = mod.SpawnObject(
+            mod.RuntimeSpawn_Common.WorldIcon,
+            mod.CreateVector(0, 0, 0),
+            mod.CreateVector(0, 0, 0)
+        )
+        mod.SetWorldIconOwner(this.hitWI, mod.GetTeam(1))
+        mod.SetWorldIconImage(this.hitWI, mod.WorldIconImages.Eye)
+        mod.SetWorldIconColor(this.hitWI, CoreUI_Colors.GreenDark)
+
+        this.hitClosestEnemyWI = mod.SpawnObject(
+            mod.RuntimeSpawn_Common.WorldIcon,
+            mod.CreateVector(0, 0, 0),
+            mod.CreateVector(0, 0, 0)
+        )
+        mod.SetWorldIconOwner(this.hitClosestEnemyWI, mod.GetTeam(1))
+        mod.SetWorldIconImage(this.hitClosestEnemyWI, mod.WorldIconImages.Alert)
+        mod.SetWorldIconColor(this.hitClosestEnemyWI, CoreUI_Colors.BlueDark) */
     }
 
     protected update(ctx: CoreAI_SensorContext): void {
+        if (ctx.memory.get('isInBattle')) {
+            return
+        }
+
         const player = ctx.player
         if (!mod.IsPlayerValid(player)) return
 
@@ -3282,11 +2798,137 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
             player,
             mod.SoldierStateBool.IsFiring
         )
+        if (isFiring) {
+            ctx.memory.set('isInBattle', true, this.ttlMs)
+            return
+        }
 
-        if (!isFiring) return
+        if (
+            !mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle) ||
+            mod.GetPlayerVehicleSeat(player) !== 0
+        ) {
+            /* mod.EnableWorldIconImage(this.targetWI, false)
+            mod.EnableWorldIconImage(this.startWI, false)
+            mod.EnableWorldIconImage(this.hitWI, false)
+            mod.EnableWorldIconImage(this.hitClosestEnemyWI, false) */
+            return
+        }
 
-        // TTL-based firing flag
-        ctx.memory.set('isFiring', true, this.ttlMs)
+        const myTeamId = mod.GetObjId(mod.GetTeam(player))
+
+        const playerVehiclePos = mod.GetVehicleState(
+            mod.GetVehicleFromPlayer(player),
+            mod.VehicleStateVector.VehiclePosition
+        )
+
+        const startInitPos = mod.CreateVector(
+            mod.XComponentOf(playerVehiclePos),
+            mod.YComponentOf(playerVehiclePos) + 1,
+            mod.ZComponentOf(playerVehiclePos)
+        )
+
+        const allPlayers = mod.AllPlayers()
+        const count = mod.CountOf(allPlayers)
+
+        for (let i = 0; i < count; i++) {
+            const p = mod.ValueInArray(allPlayers, i) as mod.Player
+            if (!mod.IsPlayerValid(p)) continue
+
+            if (mod.GetObjId(mod.GetTeam(p)) === myTeamId) continue
+
+            if (!mod.GetSoldierState(p, mod.SoldierStateBool.IsAlive)) continue
+
+            let targetPos = mod.GetSoldierState(
+                p,
+                mod.SoldierStateVector.EyePosition
+            )
+
+            if (mod.GetSoldierState(p, mod.SoldierStateBool.IsInVehicle)) {
+                const vehicle = mod.GetVehicleFromPlayer(p)
+
+                const enemyVehiclePos = mod.GetVehicleState(
+                    vehicle,
+                    mod.VehicleStateVector.VehiclePosition
+                )
+
+                targetPos = mod.CreateVector(
+                    mod.XComponentOf(enemyVehiclePos),
+                    mod.YComponentOf(enemyVehiclePos) + 1,
+                    mod.ZComponentOf(enemyVehiclePos)
+                )
+            }
+
+            const dir = mod.DirectionTowards(startInitPos, targetPos)
+            const startPos = mod.Add(
+                startInitPos,
+                mod.Multiply(dir, this.VEHICLE_OFFSET)
+            )
+
+            mod.RayCast(player, startPos, targetPos)
+
+            /**
+             *
+             */
+            /* mod.EnableWorldIconImage(this.startWI, true)
+            mod.SetWorldIconPosition(this.startWI, startPos)
+
+            mod.EnableWorldIconImage(this.targetWI, true)
+            mod.SetWorldIconPosition(this.targetWI, targetPos) */
+        }
+    }
+
+    override onRayCastHit?(
+        ctx: CoreAI_SensorContext,
+        eventPoint: mod.Vector,
+        eventNormal: mod.Vector
+    ): void {
+        const player = ctx.player
+        if (!mod.IsPlayerValid(player)) return
+
+        /**
+         *
+         */
+        /* mod.EnableWorldIconImage(this.hitWI, true)
+        mod.SetWorldIconPosition(this.hitWI, eventPoint) */
+
+        const myTeamId = mod.GetObjId(mod.GetTeam(player))
+        const enemyTeamId = mod.GetTeam(myTeamId === 1 ? 2 : 1)
+
+        const enemy = mod.ClosestPlayerTo(eventPoint, enemyTeamId)
+
+        if (!mod.IsPlayerValid(enemy)) return
+
+        let enemyPos = mod.GetSoldierState(
+            enemy,
+            mod.SoldierStateVector.EyePosition
+        )
+
+        let maxHitDist = 0.4
+
+        if (mod.GetSoldierState(enemy, mod.SoldierStateBool.IsInVehicle)) {
+            maxHitDist = this.VEHICLE_OFFSET
+
+            const ep = mod.GetSoldierState(
+                enemy,
+                mod.SoldierStateVector.GetPosition
+            )
+            enemyPos = mod.CreateVector(
+                mod.XComponentOf(ep),
+                mod.YComponentOf(ep) + 1,
+                mod.ZComponentOf(ep)
+            )
+        }
+
+        // mod.SetWorldIconPosition(this.hitClosestEnemyWI, enemyPos)
+        // mod.EnableWorldIconImage(this.hitClosestEnemyWI, true)
+
+        const hitDist = mod.DistanceBetween(eventPoint, enemyPos)
+
+        // mod.DisplayHighlightedWorldLogMessage(mod.Message(hitDist))
+
+        if (hitDist > maxHitDist) return
+
+        ctx.memory.set('isInBattle', true, this.ttlMs)
     }
 
     override onDamaged?(
@@ -3295,8 +2937,7 @@ export class CoreAI_FightSensor extends CoreAI_ASensor {
         eventDamageType: mod.DamageType,
         eventWeaponUnlock: mod.WeaponUnlock
     ): void {
-        // Set damagedBy with configured TTL
-        ctx.memory.set('damagedBy', eventOtherPlayer, this.ttlMs)
+        ctx.memory.set('isInBattle', true, this.ttlMs)
     }
 }
 
@@ -3399,10 +3040,14 @@ export class CoreAI_Brain {
 
     onDeployed(): void {}
 
-    onDied(): void {
+    reset(): void {
         this.perception.reset()
         this.memory.reset()
         this.behaviorController.resetAll()
+
+        if (mod.IsPlayerValid(this.player)) {
+            mod.AISetTarget(this.player)
+        }
     }
 
     onUndeploy(): void {}
@@ -3412,9 +3057,7 @@ export class CoreAI_Brain {
      * ------------------------------------------------------------ */
 
     onMoveFinished(success: boolean): void {
-        // mod.DisplayHighlightedWorldLogMessage(mod.Message(454))
-
-        this.memory.set('moveToPos', null)
+        this.memory.set('roamPos', null)
         this.emit('OnMoveFinished', success)
     }
 
@@ -3445,6 +3088,23 @@ export class CoreAI_Brain {
     }
 
     /* ------------------------------------------------------------
+     * Raycast hit event
+     * ------------------------------------------------------------ */
+
+    onRayCastHit(eventPoint: mod.Vector, eventNormal: mod.Vector): void {
+        const fightSensor = this.getSensor(CoreAI_FightSensor)
+        if (!fightSensor) return
+
+        const sensorCtx: CoreAI_SensorContext = {
+            player: this.player,
+            memory: this.memory,
+            time: this.memory.time,
+        }
+
+        fightSensor.onRayCastHit?.(sensorCtx, eventPoint, eventNormal)
+    }
+
+    /* ------------------------------------------------------------
      * Tick (called by BrainComponent)
      * ------------------------------------------------------------ */
 
@@ -3459,6 +3119,13 @@ export class CoreAI_Brain {
             !mod.GetSoldierState(this.player, mod.SoldierStateBool.IsAlive)
         ) {
             return
+        }
+
+        const enemy = this.memory.get('closestEnemy')
+        if (enemy && mod.IsPlayerValid(enemy)) {
+            mod.AISetTarget(this.player, enemy)
+        } else {
+            mod.AISetTarget(this.player)
         }
 
         const sensorCtx: CoreAI_SensorContext = {
@@ -3517,44 +3184,6 @@ export class CoreAI_Brain {
     }
 }
 
-// -------- FILE: src\Core\AI\Modules\Task\ITaskScoringEntry.ts --------
-// src/Core/AI/Modules/Task/ITaskScoringEntry.ts
-/**
- * CoreAI_ITaskScoringEntry:
- * - score(brain): returns utility score for this behavior.
- * - factory(brain): creates a ready-to-run behavior instance.
- *
- * TaskSelector:
- * - picks the entry with highest score
- * - calls factory(brain) to get the behavior instance
- */
-export interface CoreAI_ITaskScoringEntry {
-    score: (brain: CoreAI_Brain) => number
-    factory: (brain: CoreAI_Brain) => CoreAI_ABehavior
-}
-
-// -------- FILE: src\Core\AI\Profiles\AProfile.ts --------
-/**
- * CoreAI_AProfile:
- * Base AI profile.
- *
- * Contains:
- *  - scoring: list of behavior scoring entries
- *  - sensors: list of sensor factory functions
- *
- * Each sensor factory returns a new sensor instance:
- *    () => new SomeSensor(...)
- *
- * This ensures every AI brain receives fresh, isolated sensors.
- */
-export abstract class CoreAI_AProfile {
-    /** Task scoring table for behaviors. */
-    scoring: CoreAI_ITaskScoringEntry[] = []
-
-    /** Sensor factories. Each returns a new CoreAI_ASensor instance. */
-    sensors: (() => CoreAI_ASensor)[] = []
-}
-
 // -------- FILE: src\Core\AI\Modules\Behavior\Behaviors\FightBehavior.ts --------
 /**
  * FightBehavior:
@@ -3566,15 +3195,39 @@ export abstract class CoreAI_AProfile {
 export class CoreAI_FightBehavior extends CoreAI_ABehavior {
     public name = 'fight'
 
-    constructor(brain: CoreAI_Brain) {
+    private readonly mode: CoreAI_BehaviorMode
+
+    constructor(brain: CoreAI_Brain, mode: CoreAI_BehaviorMode = 'onFoot') {
         super(brain)
+        this.mode = mode
     }
 
-    override enter(): void {
+    override async enter(): Promise<void> {
         const player = this.brain.player
-        if (mod.IsPlayerValid(player)) {
-            mod.AIBattlefieldBehavior(player)
+        if (!mod.IsPlayerValid(player)) {
+            return
         }
+
+        if (this.mode === 'onDrive') {
+            const vehicle = mod.GetVehicleFromPlayer(player)
+            if (!vehicle) return
+
+            mod.ForcePlayerExitVehicle(player, vehicle)
+            await mod.Wait(0)
+            await mod.Wait(0)
+            mod.ForcePlayerToSeat(player, vehicle, 0)
+
+            /* mod.AIDefendPositionBehavior(
+                player,
+                mod.GetSoldierState(player, mod.SoldierStateVector.GetPosition),
+                0,
+                10
+            ) */
+            mod.AIBattlefieldBehavior(player)
+            return
+        }
+
+        mod.AIBattlefieldBehavior(player)
     }
 
     override update(): void {
@@ -3645,104 +3298,92 @@ export class CoreAI_DefendBehavior extends CoreAI_ABehavior {
     }
 }
 
-// -------- FILE: src\Core\AI\Modules\Behavior\Behaviors\MoveToBehavior.ts --------
-type CoreAI_MoveToMode = 'onfoot' | 'driver'
-
+// -------- FILE: src\Core\AI\Modules\Behavior\Behaviors\EnterVehicleBehavior.ts --------
 /**
- * MoveToBehavior:
- * - Starts movement in enter()
- * - Runs as long as memory.moveToPos exists
- * - Stopped automatically when TTL clears moveToPos
- * - Optional target enables AISetTarget during movement
- * - Mode selects on-foot or driver logic (never both)
- *
- * TTL-driven memory replaces durationMs logic.
+ * EnterVehicleBehavior:
+ * Attempts to enter a specific vehicle seat when close enough.
  */
-export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
-    public name = 'moveto'
+export class CoreAI_EnterVehicleBehavior extends CoreAI_ABehavior {
+    public name = 'entervehicle'
 
-    private readonly targetPos: mod.Vector
-    private readonly speed: mod.MoveSpeed
-    private readonly target: mod.Player | null
-    private readonly mode: CoreAI_MoveToMode
+    private readonly vehicle: mod.Vehicle
+    private readonly seatIndex: number
+    private readonly enterDist: number
 
     constructor(
         brain: CoreAI_Brain,
-        pos: mod.Vector,
-        speed: mod.MoveSpeed,
-        target: mod.Player | null = null,
-        mode: CoreAI_MoveToMode = 'onfoot'
+        vehicle: mod.Vehicle,
+        seatIndex: number = 0,
+        enterDist: number = 3.0
     ) {
         super(brain)
-        this.targetPos = pos
-        this.speed = speed
-        this.target = target
-        this.mode = mode
+        this.vehicle = vehicle
+        this.seatIndex = seatIndex
+        this.enterDist = enterDist
+        this.intervalMs = 500
     }
 
-    override async enter(): Promise<void> {
-        /* console.log(
-            mod.XComponentOf(this.targetPos),
-            ' ',
-            mod.YComponentOf(this.targetPos),
-            ' ',
-            mod.ZComponentOf(this.targetPos)
-        ) */
-
+    override enter(): void {
+        // this.tryEnter()
         const player = this.brain.player
         if (!mod.IsPlayerValid(player)) return
 
-        if (this.target && mod.IsPlayerValid(this.target)) {
-            mod.AISetTarget(player, this.target)
-        } else {
-            mod.AISetTarget(player)
-        }
-
-        if (this.mode === 'driver') {
-            await this.enterDriverMove(player)
+        if (mod.IsVehicleSeatOccupied(this.vehicle, 0)) {
             return
         }
 
-        this.enterOnFootMove(player)
-    }
+        mod.ForcePlayerToSeat(player, this.vehicle, this.seatIndex)
 
-    private async enterDriverMove(player: mod.Player): Promise<void> {
-        const vehicle = mod.GetVehicleFromPlayer(player)
-        if (!vehicle) return
-
-        mod.ForcePlayerExitVehicle(player, vehicle)
-        await mod.Wait(0)
-        await mod.Wait(0)
-        mod.ForcePlayerToSeat(player, vehicle, 0)
-        mod.AIDefendPositionBehavior(player, this.targetPos, 0, 10)
-        // mod.AIValidatedMoveToBehavior(player, this.targetPos)
-    }
-
-    private enterOnFootMove(player: mod.Player): void {
-        mod.AISetMoveSpeed(player, this.speed)
-        mod.AIValidatedMoveToBehavior(player, this.targetPos)
+        this.brain.memory.set('vehicleToDrive', null)
     }
 
     override update(): void {
-        // Nothing needed here anymore.
-        // TTL in memory determines when this behavior stops being selected.
+        // this.tryEnter()
     }
 
-    override exit(): void {
-        if (this.target && mod.IsPlayerValid(this.brain.player)) {
-            mod.AISetTarget(this.brain.player)
+    private tryEnter(): void {
+        const player = this.brain.player
+        if (!mod.IsPlayerValid(player)) return
+        if (!this.vehicle) {
+            this.brain.memory.set('vehicleToDrive', null)
+            return
         }
+
+        if (mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle)) {
+            this.brain.memory.set('vehicleToDrive', null)
+            return
+        }
+
+        const vPos = mod.GetVehicleState(
+            this.vehicle,
+            mod.VehicleStateVector.VehiclePosition
+        )
+        const dist = mod.DistanceBetween(mod.GetObjectPosition(player), vPos)
+        if (dist > this.enterDist) {
+            return
+        }
+
+        const occupant = mod.GetPlayerFromVehicleSeat(
+            this.vehicle,
+            this.seatIndex
+        )
+        if (mod.IsPlayerValid(occupant)) {
+            this.brain.memory.set('vehicleToDrive', null)
+            return
+        }
+
+        mod.ForcePlayerToSeat(player, this.vehicle, this.seatIndex)
     }
 }
 
-// -------- FILE: src\Core\AI\Modules\Perception\Sensors\MoveTo\ClosestEnemySensor.ts --------
+// -------- FILE: src\Core\AI\Modules\Perception\Sensors\ClosestEnemySensor.ts --------
 /**
  * ClosestEnemySensor:
  * Detects the closest visible enemy and writes raw data into memory.
  *
  * Writes:
  * - memory.closestEnemy
- * - memory.moveToPos
+ * - memory.roamPos
  *
  * Notes:
  * - No POIs are created.
@@ -3774,7 +3415,7 @@ export class CoreAI_ClosestEnemySensor extends CoreAI_ASensor {
         if (!mod.IsPlayerValid(newEnemy)) {
             // Clear enemy memory (TTL = immediate)
             ctx.memory.set('closestEnemy', null)
-            // ctx.memory.set('moveToPos', null)
+            // ctx.memory.set('roamPos', null)
             return
         }
 
@@ -3792,7 +3433,67 @@ export class CoreAI_ClosestEnemySensor extends CoreAI_ASensor {
 
         // Write memory with TTL
         ctx.memory.set('closestEnemy', newEnemy, this.ttlMs)
-        ctx.memory.set('moveToPos', enemyPos, this.ttlMs)
+    }
+}
+
+// -------- FILE: src\Core\AI\Modules\Perception\Sensors\VehicleToDriveSensor.ts --------
+/**
+ * VehicleToDriveSensor:
+ * Finds the closest vehicle with a free driver seat within radius.
+ *
+ * Writes:
+ * - memory.vehicleToDrive
+ */
+export class CoreAI_VehicleToDriveSensor extends CoreAI_ASensor {
+    constructor(
+        private readonly radius: number = 30,
+        intervalMs: number = 1000,
+        private readonly ttlMs: number = 3000
+    ) {
+        super(intervalMs)
+    }
+
+    protected update(ctx: CoreAI_SensorContext): void {
+        const player = ctx.player
+        if (!mod.IsPlayerValid(player)) return
+        if (mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle)) {
+            ctx.memory.set('vehicleToDrive', null)
+            return
+        }
+
+        const myPos = mod.GetObjectPosition(player)
+
+        const vehicles = mod.AllVehicles()
+        const count = mod.CountOf(vehicles)
+
+        let closest: mod.Vehicle | null = null
+        let closestDist = Infinity
+
+        for (let i = 0; i < count; i++) {
+            const v = mod.ValueInArray(vehicles, i) as mod.Vehicle
+
+            if (mod.IsVehicleSeatOccupied(v, 0)) {
+                continue
+            }
+
+            const vPos = mod.GetVehicleState(
+                v,
+                mod.VehicleStateVector.VehiclePosition
+            )
+            const dist = mod.DistanceBetween(myPos, vPos)
+            if (dist > this.radius) continue
+
+            if (dist < closestDist) {
+                closestDist = dist
+                closest = v
+            }
+        }
+
+        if (closest) {
+            ctx.memory.set('vehicleToDrive', closest, this.ttlMs)
+        } else {
+            ctx.memory.set('vehicleToDrive', null)
+        }
     }
 }
 
@@ -3868,9 +3569,9 @@ export class CoreAI_ArrivalSensor extends CoreAI_ASensor {
     }
 }
 
-// -------- FILE: src\Core\AI\Modules\Perception\Sensors\MoveTo\OnfootMoveToSensor.ts --------
+// -------- FILE: src\Core\AI\Modules\Perception\Sensors\RoamSensor.ts --------
 /**
- * MoveToSensor:
+ * RoamSensor:
  * Picks a movement target from a list of points.
  *
  * Design:
@@ -3879,7 +3580,7 @@ export class CoreAI_ArrivalSensor extends CoreAI_ASensor {
  * - Velocity is preferred when speed > threshold.
  * - Intent direction stabilizes steering across replans.
  */
-export class CoreAI_OnfootMoveToSensor extends CoreAI_ASensor {
+export class CoreAI_RoamSensor extends CoreAI_ASensor {
     private readonly ttlMs: number
 
     private coldStart: boolean = true
@@ -3890,7 +3591,7 @@ export class CoreAI_OnfootMoveToSensor extends CoreAI_ASensor {
     constructor(
         private readonly getPoints: () => mod.Vector[],
         intervalMs: number = 750,
-        ttlMs: number = 6000
+        ttlMs: number = 2000
     ) {
         super(intervalMs)
         this.ttlMs = ttlMs
@@ -3902,14 +3603,13 @@ export class CoreAI_OnfootMoveToSensor extends CoreAI_ASensor {
     }
 
     protected update(ctx: CoreAI_SensorContext): void {
-        const player = ctx.player
-        if (!mod.IsPlayerValid(player)) return
-        if (mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle)) {
+        // Do not reselect while intent exists
+        if (ctx.memory.get('roamPos')) {
             return
         }
 
-        // Do not reselect while intent exists
-        if (ctx.memory.get('moveToPos')) return
+        const player = ctx.player
+        if (!mod.IsPlayerValid(player)) return
 
         const points = this.getPoints()
         if (!points || points.length === 0) return
@@ -4012,7 +3712,7 @@ export class CoreAI_OnfootMoveToSensor extends CoreAI_ASensor {
         // Commit
         // ------------------------------------------------------------
 
-        ctx.memory.set('moveToPos', best.pos, this.ttlMs)
+        ctx.memory.set('roamPos', best.pos, this.ttlMs)
         this.lastIntentDir = mod.DirectionTowards(myPos, best.pos)
         this.coldStart = false
     }
@@ -4042,7 +3742,75 @@ export class CoreAI_OnfootMoveToSensor extends CoreAI_ASensor {
     }
 }
 
-// -------- FILE: src\Core\AI\Modules\Perception\Sensors\MoveTo\CapturePointMoveToSensor.ts --------
+// -------- FILE: src\Core\AI\Modules\Perception\Sensors\CapturePointSensor.ts --------
+/**
+ * VehicleToDriveSensor:
+ * Finds the closest vehicle with a free driver seat within radius.
+ *
+ * Writes:
+ * - memory.vehicleToDrive
+ */
+export class CoreAI_CapturePointSensor extends CoreAI_ASensor {
+    constructor(
+        // private readonly radius: number = 30,
+        intervalMs: number = 1000,
+        private readonly ttlMs: number = 3000
+    ) {
+        super(intervalMs)
+    }
+
+    protected update(ctx: CoreAI_SensorContext): void {
+        const player = ctx.player
+        if (!mod.IsPlayerValid(player)) return
+
+        const capturePoints = mod.AllCapturePoints()
+        const count = mod.CountOf(capturePoints)
+
+        let closest: mod.CapturePoint | null = null
+        let closestDist = Infinity
+
+        for (let i = 0; i < count; i++) {
+            const cp = mod.ValueInArray(capturePoints, i) as mod.CapturePoint
+
+            // console.log(mod.GetObjId(cp))
+            // console.log(mod.GetCapturePoint(mod.GetObjId(cp)))
+
+            /* const pos = mod.GetObjectPosition(cp)
+            console.log(
+                mod.XComponentOf(pos),
+                ' ',
+                mod.YComponentOf(pos),
+                ' ',
+                mod.ZComponentOf(pos),
+                ' '
+            ) */
+
+            /* if (mod.IsVehicleSeatOccupied(v, 0)) {
+                continue
+            }
+
+            const vPos = mod.GetVehicleState(
+                v,
+                mod.VehicleStateVector.VehiclePosition
+            )
+            const dist = mod.DistanceBetween(myPos, vPos)
+            if (dist > this.radius) continue
+
+            if (dist < closestDist) {
+                closestDist = dist
+                closest = v
+            } */
+        }
+
+        if (closest) {
+            ctx.memory.set('capturePoint', closest, this.ttlMs)
+        } else {
+            ctx.memory.set('capturePoint', null)
+        }
+    }
+}
+
+// -------- FILE: src\Core\AI\Modules\Perception\Sensors\CapturePointMoveToSensor.ts --------
 /**
  * MoveToCapturePointSensor
  *
@@ -4057,8 +3825,8 @@ export class CoreAI_OnfootMoveToSensor extends CoreAI_ASensor {
  *   to reduce AI clustering.
  *
  * Memory:
- * - Writes `moveToPos` intent with a TTL.
- * - Does not reselect while a valid `moveToPos` intent exists.
+ * - Writes `roamPos` intent with a TTL.
+ * - Does not reselect while a valid `roamPos` intent exists.
  *
  * Notes:
  * - No pathfinding or movement logic (sensor-only).
@@ -4084,7 +3852,7 @@ export class CoreAI_CapturePointMoveToSensor extends CoreAI_ASensor {
         if (!mod.IsPlayerValid(player)) return
 
         // Do not reselect while intent exists
-        if (ctx.memory.get('moveToPos')) return
+        if (ctx.memory.get('roamPos')) return
 
         const capturePoints = this.getCapturePoints()
         if (!capturePoints || capturePoints.length === 0) return
@@ -4126,7 +3894,7 @@ export class CoreAI_CapturePointMoveToSensor extends CoreAI_ASensor {
 
         // only one candidate
         if (!secondClosest) {
-            ctx.memory.set('moveToPos', closest.pos, this.ttlMs)
+            ctx.memory.set('roamPos', closest.pos, this.ttlMs)
             return
         }
 
@@ -4135,268 +3903,82 @@ export class CoreAI_CapturePointMoveToSensor extends CoreAI_ASensor {
         // ------------------------------------------------------------
 
         ctx.memory.set(
-            'moveToPos',
+            'roamPos',
             Math.random() < 1 ? closest.pos : secondClosest.pos,
             this.ttlMs
         )
     }
 }
 
-// -------- FILE: src\Core\AI\Modules\Perception\Sensors\MoveTo\DriverMoveToSensor.ts --------
-/**
- * MoveToSensor:
- * Picks a movement target from a list of points.
- *
- * Design:
- * - Direction-driven, no historical recents.
- * - While moving, backward targets are forbidden.
- * - Velocity is preferred when speed > threshold.
- * - Intent direction stabilizes steering across replans.
- */
-export class CoreAI_DriverMoveToSensor extends CoreAI_ASensor {
-    private readonly ttlMs: number
+// -------- FILE: src\Core\AI\Profiles\BaseProfile.ts --------
+export type CoreAI_BaseProfileOptions = CoreAI_SensorOptions
 
-    private coldStart: boolean = true
-
-    // Cached movement intent direction
-    private lastIntentDir: mod.Vector | null = null
-
-    constructor(
-        private readonly getPoints: () => mod.Vector[],
-        intervalMs: number = 750,
-        ttlMs: number = 6000
-    ) {
-        super(intervalMs)
-        this.ttlMs = ttlMs
-    }
-
-    override reset(): void {
-        this.coldStart = true
-        this.lastIntentDir = null
-    }
-
-    protected update(ctx: CoreAI_SensorContext): void {
-        const player = ctx.player
-        if (!mod.IsPlayerValid(player)) return
-        if (!mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle)) {
-            return
-        }
-
-        // Do not reselect while intent exists
-        if (ctx.memory.get('moveToPos')) return
-
-        const points = this.getPoints()
-        if (!points || points.length === 0) return
-
-        const myPos = mod.GetObjectPosition(player)
-
-        const vehicle = mod.GetVehicleFromPlayer(player)
-        if (!vehicle) return
-        const driver = mod.GetPlayerFromVehicleSeat(vehicle, 0)
-        if (!mod.IsPlayerValid(driver) || !mod.Equals(driver, player)) return
-
-        // ------------------------------------------------------------
-        // Resolve forward direction (vehicle)
-        // ------------------------------------------------------------
-
-        const vel = mod.GetVehicleState(
-            vehicle,
-            mod.VehicleStateVector.LinearVelocity
-        )
-        const speedSq = mod.DotProduct(vel, vel)
-        const speed = Math.sqrt(speedSq)
-
-        let forward: mod.Vector | null = null
-
-        // 1. True movement direction
-        if (speed > 0.3) {
-            if (speedSq > 0.1) {
-                forward = mod.Normalize(vel)
-                this.lastIntentDir = forward
-            }
-        }
-
-        // 2. Cached intent
-        if (!forward && this.lastIntentDir) {
-            forward = this.lastIntentDir
-        }
-
-        // 3. Facing fallback
-        if (!forward) {
-            const face = mod.GetVehicleState(
-                vehicle,
-                mod.VehicleStateVector.FacingDirection
-            )
-            forward = mod.Normalize(face)
-            this.lastIntentDir = forward
-        }
-
-        // ------------------------------------------------------------
-        // Build candidates
-        // ------------------------------------------------------------
-
-        const candidates: {
-            pos: mod.Vector
-            dist: number
-            dot: number
-        }[] = []
-
-        const ARRIVAL_EXCLUDE_DIST = 10.0
-
-        for (const pos of points) {
-            const dist = mod.DistanceBetween(myPos, pos)
-
-            // Already here, do not reselect
-            if (dist < ARRIVAL_EXCLUDE_DIST) {
-                continue
-            }
-
-            const dir = mod.DirectionTowards(myPos, pos)
-            const dot = mod.DotProduct(forward, dir)
-
-            candidates.push({ pos, dist, dot })
-        }
-
-        if (candidates.length === 0) return
-
-        // ------------------------------------------------------------
-        // While moving, forbid backward choices
-        // ------------------------------------------------------------
-
-        let usable = candidates
-
-        if (speed > 0.5) {
-            usable = candidates.filter((c) => c.dot > 0)
-        }
-
-        if (usable.length === 0) return
-
-        // ------------------------------------------------------------
-        // Pick best candidate
-        // ------------------------------------------------------------
-
-        let best = usable[0]
-        let bestScore = -Infinity
-
-        for (const c of usable) {
-            const score = this.scoreCandidate(c)
-            if (score > bestScore) {
-                bestScore = score
-                best = c
-            }
-        }
-
-        // ------------------------------------------------------------
-        // Commit
-        // ------------------------------------------------------------
-
-        ctx.memory.set('moveToPos', best.pos, this.ttlMs)
-        this.lastIntentDir = mod.DirectionTowards(myPos, best.pos)
-        this.coldStart = false
-    }
-
-    private scoreCandidate(c: {
-        pos: mod.Vector
-        dist: number
-        dot: number
-    }): number {
-        // Distance band scoring
-        let distScore = 0
-        if (c.dist <= 15) {
-            distScore = c.dist / 15
-        } else if (c.dist <= 40) {
-            distScore = 1
-        } else {
-            const over = c.dist - 40
-            distScore = over >= 20 ? 0 : 1 - over / 20
-        }
-
-        const dirScore = Math.max(0, c.dot)
-
-        const jitterMax = this.coldStart ? 0.8 : 0.4
-        const jitter = Math.random() * jitterMax
-
-        return distScore * 0.7 + dirScore * 0.3 + jitter
-    }
-}
-
-// -------- FILE: src\Core\AI\Profiles\CombatantProfile.ts --------
-export interface CoreAI_CombatantProfileOptions {
-    fightSensor?: {
-        intervalMs?: number
-        ttlMs?: number
-    }
-    closestEnemySensor?: {
-        sensitivity?: number
-        intervalMs?: number
-        ttlMs?: number
-    }
-    arrivalSensor?: {
-        getWPs?: () => mod.Vector[]
-        intervalMs?: number
-        distanceThreshold?: number
-        ttlMs?: number
-        cooldownMs?: number
-    }
-    onfootMoveToSensor?: {
-        getWPs?: () => mod.Vector[]
-        intervalMs?: number
-        ttlMs?: number
-    }
-    driverMoveToSensor?: {
-        getWPs?: () => mod.Vector[]
-        intervalMs?: number
-        ttlMs?: number
-    }
-    moveToCapturePointSensor?: {
-        getCapturePoints?: () => mod.CapturePoint[]
-        intervalMs?: number
-        ttlMs?: number
-    }
-}
-
-export class CoreAI_CombatantProfile extends CoreAI_AProfile {
-    constructor(options: CoreAI_CombatantProfileOptions = {}) {
+export class CoreAI_BaseProfile extends CoreAI_AProfile {
+    constructor(options: CoreAI_BaseProfileOptions = {}) {
         super()
-
-        const getMoveMode = (brain: { player: mod.Player }) => {
-            const player = brain.player
-            if (!mod.IsPlayerValid(player)) return 'onfoot'
-
-            const inVehicle = mod.GetSoldierState(
-                player,
-                mod.SoldierStateBool.IsInVehicle
-            )
-            if (!inVehicle) return 'onfoot'
-
-            const vehicle = mod.GetVehicleFromPlayer(player)
-            if (!vehicle) return 'onfoot'
-
-            const driver = mod.GetPlayerFromVehicleSeat(vehicle, 0)
-            return mod.IsPlayerValid(driver) && mod.Equals(driver, player)
-                ? 'driver'
-                : 'onfoot'
-        }
 
         this.scoring = [
             {
                 score: (brain) => {
                     const m = brain.memory
-                    return m.get('isFiring') || m.get('damagedBy') ? 200 : 0
+                    return m.get('isInBattle') ? 200 : 0
                 },
-                factory: (brain) => new CoreAI_FightBehavior(brain),
+                factory: (brain) =>
+                    new CoreAI_FightBehavior(brain, this.getMoveMode(brain)),
             },
 
             {
                 score: (brain) => (brain.memory.get('closestEnemy') ? 150 : 0),
-                factory: (brain) =>
-                    new CoreAI_MoveToBehavior(
+                factory: (brain) => {
+                    const enemy = brain.memory.get('closestEnemy')!
+                    const pos = mod.GetSoldierState(
+                        enemy,
+                        mod.SoldierStateVector.GetPosition
+                    )
+
+                    return new CoreAI_MoveToBehavior(
                         brain,
-                        brain.memory.get('moveToPos')!,
+                        pos,
                         mod.MoveSpeed.InvestigateRun,
-                        brain.memory.get('closestEnemy'),
-                        getMoveMode(brain)
-                    ),
+                        this.getMoveMode(brain)
+                    )
+                },
+            },
+
+            {
+                score: (brain) =>
+                    brain.memory.get('vehicleToDrive') ? 290 : 0,
+                factory: (brain) => {
+                    const vehicle = brain.memory.get('vehicleToDrive')!
+                    const vPos = mod.GetVehicleState(
+                        vehicle,
+                        mod.VehicleStateVector.VehiclePosition
+                    )
+                    const dist = mod.DistanceBetween(
+                        mod.GetObjectPosition(brain.player),
+                        vPos
+                    )
+
+                    if (dist <= 5.0) {
+                        return new CoreAI_EnterVehicleBehavior(
+                            brain,
+                            vehicle,
+                            0,
+                            5.0
+                        )
+                    }
+
+                    return new CoreAI_MoveToBehavior(
+                        brain,
+                        vPos,
+                        Math.random() < 0.7
+                            ? mod.MoveSpeed.Sprint
+                            : mod.MoveSpeed.Run,
+                        'onFoot',
+                        2.0,
+                        false
+                    )
+                },
             },
 
             {
@@ -4411,85 +3993,137 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
             },
 
             {
-                score: (brain) => (brain.memory.get('moveToPos') ? 20 : 0),
-                factory: (brain) =>
-                    new CoreAI_MoveToBehavior(
+                score: (brain) => (brain.memory.get('roamPos') ? 20 : 0),
+                factory: (brain) => {
+                    const mode = this.getMoveMode(brain)
+
+                    return new CoreAI_MoveToBehavior(
                         brain,
-                        brain.memory.get('moveToPos')!,
+                        brain.memory.get('roamPos')!,
                         Math.random() < 0.3
                             ? mod.MoveSpeed.Sprint
                             : mod.MoveSpeed.Run,
-                        null,
-                        getMoveMode(brain)
-                    ),
+                        mode,
+                        mode === 'onFoot' ? 3.0 : 6.0
+                    )
+                },
             },
         ] as CoreAI_ITaskScoringEntry[]
 
-        this.sensors = [
+        this.buildSensors(options)
+    }
+
+    /**
+     *
+     */
+
+    protected getMoveMode(brain: { player: mod.Player }): 'onFoot' | 'onDrive' {
+        const player = brain.player
+        if (!mod.IsPlayerValid(player)) return 'onFoot'
+
+        if (!mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle)) {
+            return 'onFoot'
+        }
+
+        if (mod.GetPlayerVehicleSeat(player) === 0) {
+            return 'onDrive'
+        }
+
+        return 'onFoot'
+    }
+
+    /**
+     * Shared sensor wiring for universal profiles.
+     * Extend this class to add game-mode specific sensors.
+     */
+
+    protected buildSensors(options: CoreAI_BaseProfileOptions): void {
+        this.addSensorIf(
+            options.fightSensor,
             () =>
                 new CoreAI_FightSensor(
                     options.fightSensor?.intervalMs,
                     options.fightSensor?.ttlMs
-                ),
+                )
+        )
+
+        this.addSensorIf(
+            options.closestEnemySensor,
             () =>
                 new CoreAI_ClosestEnemySensor(
                     options.closestEnemySensor?.sensitivity,
                     options.closestEnemySensor?.intervalMs,
                     options.closestEnemySensor?.ttlMs
-                ),
-        ]
+                )
+        )
 
-        if (options.arrivalSensor?.getWPs) {
-            this.sensors.push(
-                () =>
-                    new CoreAI_ArrivalSensor(
-                        () => options.arrivalSensor!.getWPs!(),
-                        options.arrivalSensor?.intervalMs,
-                        options.arrivalSensor?.distanceThreshold,
-                        options.arrivalSensor?.ttlMs,
-                        options.arrivalSensor?.cooldownMs
-                    )
-            )
-        }
+        this.addSensorIf(
+            options.vehicleToDriveSensor,
+            () =>
+                new CoreAI_VehicleToDriveSensor(
+                    options.vehicleToDriveSensor?.radius,
+                    options.vehicleToDriveSensor?.intervalMs,
+                    options.vehicleToDriveSensor?.ttlMs
+                )
+        )
 
-        if (options.moveToCapturePointSensor?.getCapturePoints) {
-            this.sensors.push(
-                () =>
-                    new CoreAI_CapturePointMoveToSensor(
-                        () =>
-                            options.moveToCapturePointSensor!
-                                .getCapturePoints!(),
-                        options.moveToCapturePointSensor?.intervalMs,
-                        options.moveToCapturePointSensor?.ttlMs
-                    )
-            )
-        }
+        this.addSensorIf(
+            options.arrivalSensor?.getWPs,
+            () =>
+                new CoreAI_ArrivalSensor(
+                    () => options.arrivalSensor!.getWPs!(),
+                    options.arrivalSensor?.intervalMs,
+                    options.arrivalSensor?.distanceThreshold,
+                    options.arrivalSensor?.ttlMs,
+                    options.arrivalSensor?.cooldownMs
+                )
+        )
 
-        if (options.onfootMoveToSensor?.getWPs) {
-            this.sensors.push(
-                () =>
-                    new CoreAI_OnfootMoveToSensor(
-                        () => options.onfootMoveToSensor!.getWPs!(),
-                        options.onfootMoveToSensor?.intervalMs,
-                        options.onfootMoveToSensor?.ttlMs
-                    )
-            )
-        }
+        this.addSensorIf(
+            options.capturePointSensor,
+            () =>
+                new CoreAI_CapturePointSensor(
+                    options.capturePointSensor?.intervalMs,
+                    options.capturePointSensor?.ttlMs
+                )
+        )
 
-        if (options.driverMoveToSensor?.getWPs) {
-            this.sensors.push(
-                () =>
-                    new CoreAI_DriverMoveToSensor(
-                        () => options.driverMoveToSensor!.getWPs!(),
-                        options.driverMoveToSensor?.intervalMs,
-                        options.driverMoveToSensor?.ttlMs
-                    )
-            )
-        }
+        this.addSensorIf(
+            options.moveToCapturePointSensor?.getCapturePoints,
+            () =>
+                new CoreAI_CapturePointMoveToSensor(
+                    () => options.moveToCapturePointSensor!.getCapturePoints!(),
+                    options.moveToCapturePointSensor?.intervalMs,
+                    options.moveToCapturePointSensor?.ttlMs
+                )
+        )
+
+        this.addSensorIf(
+            options.roamSensor?.getWPs,
+            () =>
+                new CoreAI_RoamSensor(
+                    () => options.roamSensor!.getWPs!(),
+                    options.roamSensor?.intervalMs,
+                    options.roamSensor?.ttlMs
+                )
+        )
     }
 }
 
-// -------- FILE: src\Core\AI\Components\BrainComponent.ts --------
+// -------- FILE: src\Core\AI\Profiles\CombatantProfile.ts --------
+export type CoreAI_CombatantProfileOptions = CoreAI_SensorOptions
+
+export class CoreAI_CombatantProfile extends CoreAI_BaseProfile {
+    constructor(options: CoreAI_CombatantProfileOptions = {}) {
+        super(options)
+
+        /* this.scoring = [
+            // your custom scoring entries here
+        ] */
+    }
+}
+
+// -------- FILE: src\Core\Player\Components\AI\BrainComponent.ts --------
 // src/Core/AI/Components/BrainComponent.ts
 /**
  * BrainComponent
@@ -4497,7 +4131,7 @@ export class CoreAI_CombatantProfile extends CoreAI_AProfile {
  * AI behavior component attached to a logical player.
  * Created and configured by GameMode.
  */
-export class BrainComponent implements CorePlayer_IComponent {
+export class CorePlayer_BrainComponent implements CorePlayer_IComponent {
     public readonly brain: CoreAI_Brain
 
     private ap!: CorePlayer_APlayer
@@ -4518,11 +4152,20 @@ export class BrainComponent implements CorePlayer_IComponent {
                 if (!other) return
                 this.brain.onDamaged(other.player, damageType, weapon)
             },
+            OnRayCastHit: (eventPoint, eventNormal) => {
+                this.brain.onRayCastHit(eventPoint, eventNormal)
+            },
             OnAIMoveToSucceeded: () => {
                 this.brain.onMoveFinished(true)
             },
             OnAIMoveToFailed: () => {
                 this.brain.onMoveFinished(false)
+            },
+            OnPlayerDied: () => {
+                this.brain.reset()
+            },
+            OnPlayerUndeploy: () => {
+                this.brain.reset()
             },
         })
     }
@@ -4541,7 +4184,7 @@ export class BrainComponent implements CorePlayer_IComponent {
 }
 
 // -------- FILE: src\Core\Squad\Squad.ts --------
-export class CoreAI_Squad {
+export class Core_Squad {
     private members: CorePlayer_APlayer[] = []
     private leader: CorePlayer_APlayer | null = null
 
@@ -4616,14 +4259,14 @@ export class CoreAI_Squad {
             return
         }
 
-        const brainComp = ap.getComponent(BrainComponent)
+        const brainComp = ap.getComponent(CorePlayer_BrainComponent)
         if (!brainComp) {
             return
         }
 
         // Assign combatant profile configured to follow leader
         const profile = new CoreAI_CombatantProfile({
-            onfootMoveToSensor: {
+            roamSensor: {
                 getWPs: () => {
                     const p = this.getSquadPoint()
                     return p ? [p] : []
@@ -4665,7 +4308,7 @@ export class CoreAI_Squad {
 // -------- FILE: src\Core\Squad\SquadManager.ts --------
 export class Core_SquadManager {
     private gameMode: Core_AGameMode
-    private squads: CoreAI_Squad[] = []
+    private squads: Core_Squad[] = []
     private maxSlots: number
 
     constructor(gameMode: Core_AGameMode, maxSlots: number = 4) {
@@ -4676,7 +4319,7 @@ export class Core_SquadManager {
     /* ------------------------------------------------------------
      * Player Join
      * ------------------------------------------------------------ */
-    async addToSquad(ap: CorePlayer_APlayer): Promise<CoreAI_Squad> {
+    async addToSquad(ap: CorePlayer_APlayer): Promise<Core_Squad> {
         const teamId = mod.GetObjId(mod.GetTeam(ap.player))
 
         // Find squad with same team + free slots
@@ -4686,7 +4329,7 @@ export class Core_SquadManager {
 
         // Create new squad if no free one exists
         if (!squad) {
-            squad = new CoreAI_Squad(this.gameMode, teamId, this.maxSlots)
+            squad = new Core_Squad(this.gameMode, teamId, this.maxSlots)
             this.squads.push(squad)
         }
 
@@ -4709,1395 +4352,141 @@ export class Core_SquadManager {
     /* ------------------------------------------------------------
      * Helpers
      * ------------------------------------------------------------ */
-    getSquad(ap: CorePlayer_APlayer): CoreAI_Squad | undefined {
+    getSquad(ap: CorePlayer_APlayer): Core_Squad | undefined {
         return this.squads.find((s) => s.getMembers().includes(ap))
     }
 
-    getSquadsByTeam(teamId: number): CoreAI_Squad[] {
+    getSquadsByTeam(teamId: number): Core_Squad[] {
         return this.squads.filter((s) => s.getTeamId() === teamId)
     }
 
-    getAllSquads(): CoreAI_Squad[] {
+    getAllSquads(): Core_Squad[] {
         return this.squads
     }
 }
 
-// -------- FILE: src\GameModes\Pressure\Map\MapData.ts --------
-// --------------------------------------------------
-// WP helpers (pure data)
-// --------------------------------------------------
-
-export interface WpIdRange {
-    from: number
-    to: number
-}
-
-// --------------------------------------------------
-// Capture point definitions
-// --------------------------------------------------
-
-export interface SectorTeamCapturePointDef {
-    hq: number
-}
-
-// --------------------------------------------------
-// Sector definitions
-// --------------------------------------------------
-
-export interface SectorTeamDef {
-    nextSectorId: number
-
-    capturePoints: {
-        [capturePointId: string]: SectorTeamCapturePointDef
-    }
-}
-
-export interface SectorDef {
-    bufferHQId: number
-    teams: {
-        [teamId: number]: SectorTeamDef
-    }
-}
-
-// --------------------------------------------------
-// Map-level data
-// --------------------------------------------------
-
-export interface MapTeamDef {
-    winCapturePointId: number
-    botCount: number
-}
-
-export interface MapDataDef {
-    map: mod.Maps
-    initSectorId: number
-    capturePointFlags: {
-        [capturePointId: number]: mod.VoiceOverFlags
-    }
-    teams: {
-        [teamId: string]: MapTeamDef
-    }
-
-    sectors: {
-        [sectorId: number]: SectorDef
-    }
-}
-
-// --------------------------------------------------
-// Map data
-// --------------------------------------------------
-
-export const MAP_DATA: readonly MapDataDef[] = [
-    {
-        map: mod.Maps.Abbasid,
-        initSectorId: 2,
-
-        capturePointFlags: {
-            1: mod.VoiceOverFlags.Alpha,
-            2: mod.VoiceOverFlags.Bravo,
-            3: mod.VoiceOverFlags.Charlie,
-            4: mod.VoiceOverFlags.Delta,
-            5: mod.VoiceOverFlags.Echo,
-            6: mod.VoiceOverFlags.Foxtrot,
-            7: mod.VoiceOverFlags.Golf,
-            8: mod.VoiceOverFlags.Alpha,
-        },
-
-        teams: {
-            1: {
-                winCapturePointId: 8,
-                botCount: 9,
-            },
-            2: {
-                winCapturePointId: 1,
-                botCount: 10,
-            },
-        },
-
-        sectors: {
-            1: {
-                bufferHQId: 1,
-                teams: {
-                    1: {
-                        capturePoints: {
-                            1: { hq: 111 },
-                        },
-                        nextSectorId: 2,
-                    },
-                    2: {
-                        capturePoints: {
-                            2: { hq: 221 },
-                            3: { hq: 321 },
-                        },
-                        nextSectorId: 1,
-                    },
-                },
-            },
-
-            2: {
-                bufferHQId: 2,
-                teams: {
-                    1: {
-                        capturePoints: {
-                            2: { hq: 211 },
-                            3: { hq: 311 },
-                        },
-                        nextSectorId: 3,
-                    },
-                    2: {
-                        capturePoints: {
-                            4: { hq: 421 },
-                            5: { hq: 521 },
-                        },
-                        nextSectorId: 1,
-                    },
-                },
-            },
-
-            3: {
-                bufferHQId: 3,
-                teams: {
-                    1: {
-                        capturePoints: {
-                            4: { hq: 411 },
-                            5: { hq: 511 },
-                        },
-                        nextSectorId: 4,
-                    },
-                    2: {
-                        capturePoints: {
-                            6: { hq: 621 },
-                            7: { hq: 721 },
-                        },
-                        nextSectorId: 2,
-                    },
-                },
-            },
-
-            4: {
-                bufferHQId: 4,
-                teams: {
-                    1: {
-                        capturePoints: {
-                            6: { hq: 611 },
-                            7: { hq: 711 },
-                        },
-                        nextSectorId: 4,
-                    },
-                    2: {
-                        capturePoints: {
-                            8: { hq: 821 },
-                        },
-                        nextSectorId: 3,
-                    },
-                },
-            },
-        },
-    },
-]
-
-// -------- FILE: src\GameModes\Pressure\Map\MapDataService.ts --------
-// --------------------------------------------------
-// Runtime indexed data
-// --------------------------------------------------
-
-interface RuntimeSector {
-    def: SectorDef
-    teams: Map<number, SectorTeamDef>
-}
-
-interface RuntimeMapData {
-    map: mod.Maps
-    initSectorId: number
-    capturePointFlags: Map<number, mod.VoiceOverFlags>
-    teams: Map<number, { winCapturePointId: number; botCount: number }>
-    sectors: Map<number, RuntimeSector>
-}
-
-// --------------------------------------------------
-// Service
-// --------------------------------------------------
-
-export class MapDataService {
-    private readonly data: RuntimeMapData
-
-    // --------------------------------------------------
-    // Construction
-    // --------------------------------------------------
-
-    constructor() {
-        // BUG: mod.IsCurrentMap(d.map) works locally ONLY
-        // const found = MAP_DATA.find((d) => mod.IsCurrentMap(d.map))
-        const found = MAP_DATA[0]
-
-        if (!found) {
-            throw new Error('No map data for current map')
-        }
-
-        this.data = this.index(found)
-    }
-
-    // --------------------------------------------------
-    // Indexing (structural only)
-    // --------------------------------------------------
-
-    private index(def: MapDataDef): RuntimeMapData {
-        const capturePointFlags = new Map<number, mod.VoiceOverFlags>()
-        for (const cpIdStr of Object.keys(def.capturePointFlags)) {
-            capturePointFlags.set(
-                Number(cpIdStr),
-                def.capturePointFlags[Number(cpIdStr)]
-            )
-        }
-
-        const teams = new Map<
-            number,
-            { winCapturePointId: number; botCount: number }
-        >()
-        for (const teamIdStr of Object.keys(def.teams)) {
-            teams.set(Number(teamIdStr), def.teams[Number(teamIdStr)])
-        }
-
-        const sectors = new Map<number, RuntimeSector>()
-        for (const sectorIdStr of Object.keys(def.sectors)) {
-            const sectorId = Number(sectorIdStr)
-            const sectorDef = def.sectors[sectorId]
-
-            const sectorTeams = new Map<number, SectorTeamDef>()
-            for (const teamIdStr of Object.keys(sectorDef.teams)) {
-                sectorTeams.set(
-                    Number(teamIdStr),
-                    sectorDef.teams[Number(teamIdStr)]
-                )
-            }
-
-            sectors.set(sectorId, {
-                def: sectorDef,
-                teams: sectorTeams,
-            })
-        }
-
-        return {
-            map: def.map,
-            initSectorId: def.initSectorId,
-            capturePointFlags,
-            teams,
-            sectors,
-        }
-    }
-
-    // --------------------------------------------------
-    // Map-level metadata API
-    // --------------------------------------------------
-
-    getInitSectorId(): number {
-        return this.data.initSectorId
-    }
-
-    getAllSectorIds(): number[] {
-        return Array.from(this.data.sectors.keys())
-    }
-
-    getAllCapturePointIds(): number[] {
-        return Array.from(this.data.capturePointFlags.keys())
-    }
-
-    getBotCount(teamId: number): number {
-        const team = this.data.teams.get(teamId)
-        if (!team) {
-            throw new Error('No team data for team ' + teamId)
-        }
-        return team.botCount
-    }
-
-    getWinCapturePointId(teamId: number): number {
-        const team = this.data.teams.get(teamId)
-        if (!team) {
-            throw new Error('No team data for team ' + teamId)
-        }
-        return team.winCapturePointId
-    }
-
-    // This checks whether a team currently owns all capture points in a sector.
-
-    doesTeamControlEntireSector(sectorId: number, teamId: number): boolean {
-        const cps = this.getAllCapturePointsInSector(sectorId)
-
-        for (const cp of cps) {
-            const ownerTeam = mod.GetCurrentOwnerTeam(cp)
-
-            if (mod.GetObjId(ownerTeam) !== teamId) {
-                return false
-            }
-        }
-
-        return true
-    }
-
-    // This checks whether a team controls the frontline of a sector,
-    // meaning all capture points assigned to other teams are owned by this team.
-
-    // BUG: currently mod.SetCapturePointOwner is not working. Cant effectively set previous sector Capture Points owner
-
-    doesTeamControlFrontline(sectorId: number, teamId: number): boolean {
-        const sector = this.getSector(sectorId)
-        const enemyCpIds = new Set<number>()
-
-        for (const [otherTeamId, teamDef] of sector.teams.entries()) {
-            if (otherTeamId === teamId) continue
-
-            for (const cpIdStr of Object.keys(teamDef.capturePoints)) {
-                enemyCpIds.add(Number(cpIdStr))
-            }
-        }
-
-        for (const cpId of enemyCpIds) {
-            const cp = mod.GetCapturePoint(cpId)
-            const ownerTeam = mod.GetCurrentOwnerTeam(cp)
-
-            if (!ownerTeam || mod.GetObjId(ownerTeam) !== teamId) {
-                return false
-            }
-        }
-
-        return true
-    }
-
-    // --------------------------------------------------
-    // Capture point metadata API
-    // --------------------------------------------------
-
-    getFlagForCapturePoint(cpId: number): mod.VoiceOverFlags | null {
-        return this.data.capturePointFlags.get(cpId) ?? null
-    }
-
-    // --------------------------------------------------
-    // Sector metadata API
-    // --------------------------------------------------
-
-    getSectorBufferHQId(sectorId: number): number | null {
-        return this.getSector(sectorId).def.bufferHQId
-    }
-
-    getNextSectorId(sectorId: number, teamId: number): number | null {
-        return this.getSectorTeam(sectorId, teamId).nextSectorId ?? null
-    }
-
-    // --------------------------------------------------
-    // AI helpers
-    // --------------------------------------------------
-
-    /* getRoamWPs(sectorId: number, player: mod.Player): mod.Vector[] {
-        const pos = this.getClosestEnemyCapturePointPosition(sectorId, player)
-
-        if (!pos) {
-            return [mod.GetObjectPosition(player)]
-        }
-        return [pos]
-    }
-
-    getDefendWPs(sectorId: number, player: mod.Player): mod.Vector[] {
-        const pos = this.getClosestEnemyCapturePointPosition(sectorId, player)
-
-        if (!pos) {
-            return [mod.GetObjectPosition(player)]
-        }
-        return [pos]
-    } */
-
-    getBotSpawnPos(sectorId: number, teamId: number): mod.Vector {
-        const team = this.getSectorTeam(sectorId, teamId)
-        const cpIds = Object.keys(team.capturePoints).map(Number)
-
-        if (cpIds.length === 0) {
-            throw new Error(
-                'No capture points for team ' +
-                    teamId +
-                    ' in sector ' +
-                    sectorId
-            )
-        }
-
-        const cpId = cpIds[Math.floor(Math.random() * cpIds.length)]
-        const hq = mod.GetHQ(team.capturePoints[cpId].hq)
-
-        return mod.GetObjectPosition(hq)
-    }
-
-    // --------------------------------------------------
-    // Objective control (engine mutation)
-    // --------------------------------------------------
-
-    enableSector(sectorId: number): void {
-        const sector = this.getSector(sectorId)
-
-        mod.EnableGameModeObjective(mod.GetSector(sectorId), true)
-
-        for (const team of sector.teams.values()) {
-            for (const cpIdStr of Object.keys(team.capturePoints)) {
-                const cpId = Number(cpIdStr)
-                const cp = mod.GetCapturePoint(cpId)
-
-                mod.EnableGameModeObjective(cp, true)
-                mod.EnableCapturePointDeploying(cp, false)
-
-                const hq = mod.GetHQ(team.capturePoints[cpId].hq)
-                if (hq) {
-                    mod.EnableHQ(hq, true)
-                }
-            }
-        }
-    }
-
-    disableSector(sectorId: number, attackingTeamId?: number): void {
-        const sector = this.getSector(sectorId)
-
-        for (const team of sector.teams.values()) {
-            for (const cpIdStr of Object.keys(team.capturePoints)) {
-                const cpId = Number(cpIdStr)
-                const cp = mod.GetCapturePoint(cpId)
-
-                if (attackingTeamId !== undefined) {
-                    mod.SetCapturePointOwner(cp, mod.GetTeam(attackingTeamId))
-                }
-
-                mod.EnableGameModeObjective(cp, false)
-                mod.EnableHQ(mod.GetHQ(team.capturePoints[cpId].hq), false)
-            }
-        }
-
-        mod.EnableGameModeObjective(mod.GetSector(sectorId), false)
-    }
-
-    disableAllSectors(): void {
-        for (const sectorId of this.data.sectors.keys()) {
-            this.disableSector(sectorId)
-        }
-    }
-
-    // --------------------------------------------------
-    // Internal helpers
-    // --------------------------------------------------
-
-    private getSector(sectorId: number): RuntimeSector {
-        const sector = this.data.sectors.get(sectorId)
-        if (!sector) {
-            throw new Error('Sector not found: ' + sectorId)
-        }
-        return sector
-    }
-
-    private getSectorTeam(sectorId: number, teamId: number): SectorTeamDef {
-        const team = this.getSector(sectorId).teams.get(teamId)
-        if (!team) {
-            throw new Error('No team ' + teamId + ' in sector ' + sectorId)
-        }
-        return team
-    }
-
-    // Returns all unique capture point ids that belong to a sector.
-
-    public getAllCapturePointsInSector(sectorId: number): mod.CapturePoint[] {
-        const sector = this.getSector(sectorId)
-        const cps = new Set<mod.CapturePoint>()
-
-        for (const team of sector.teams.values()) {
-            for (const cpId of Object.keys(team.capturePoints)) {
-                cps.add(mod.GetCapturePoint(+cpId))
-            }
-        }
-
-        return [...cps]
-    }
-
-    private resolveWpRange(range: WpIdRange): mod.Vector[] {
-        const out: mod.Vector[] = []
-
-        for (let id = range.from; id <= range.to; id++) {
-            const wp = mod.GetSpatialObject(id)
-            out.push(mod.GetObjectPosition(wp))
-        }
-
-        return out
-    }
-}
-
-// -------- FILE: src\GameModes\Pressure\IGameModeEvents.ts --------
-/*
- * Pressure-specific GameMode events.
- *
- * Extends core GameMode events without modifying Core.
- * Only PRSR_GameMode is allowed to emit these.
- */
-export interface IGameModeEvents extends CorePlayer_IGameModeEngineEvents {
-    OnSectorChanged?(
-        currentSectorId: number,
-        previousSectorId: number,
-        teamId: number,
-        bufferTime: number
-    ): void
-
-    OnCapturePointCapturedResolved?(eventCapturePoint: mod.CapturePoint): void
-}
-
-// -------- FILE: src\GameModes\Pressure\Services\VOService.ts --------
-type TeamId = number
-
-export class VOService implements IGameModeEvents {
-    // teamId -> (capturePointId -> VO)
-    private readonly capturePointVOModules = new Map<
-        TeamId,
-        Map<number, mod.VO>
-    >()
-
-    // teamId -> (sectorId -> VO)
-    private readonly sectorVOModules = new Map<TeamId, Map<number, mod.VO>>()
-
-    constructor(
-        private readonly gameMode: PRSR_GameMode,
-        private readonly mapData: MapDataService
-    ) {
-        this.initCapturePointsVO()
-        this.initSectorsVO()
-
-        this.gameMode.addListener(this)
-    }
-
-    // -------------------------------------------------
-    // Init
-    // -------------------------------------------------
-
-    private initCapturePointsVO(): void {
-        const teams: TeamId[] = [1, 2]
-        const capturePointIds = this.mapData.getAllCapturePointIds()
-
-        for (const teamId of teams) {
-            const teamMap = new Map<number, mod.VO>()
-
-            for (const cpId of capturePointIds) {
-                const vo = mod.SpawnObject(
-                    mod.RuntimeSpawn_Common.SFX_VOModule_OneShot2D,
-                    mod.CreateVector(0, 0, 0),
-                    mod.CreateVector(0, 0, 0)
-                )
-
-                teamMap.set(cpId, vo)
-            }
-
-            this.capturePointVOModules.set(teamId, teamMap)
-        }
-    }
-
-    private initSectorsVO(): void {
-        const teams: TeamId[] = [1, 2]
-        const sectorIds = this.mapData.getAllSectorIds()
-
-        for (const teamId of teams) {
-            const teamMap = new Map<number, mod.VO>()
-
-            for (const sectorId of sectorIds) {
-                const vo = mod.SpawnObject(
-                    mod.RuntimeSpawn_Common.SFX_VOModule_OneShot2D,
-                    mod.CreateVector(0, 0, 0),
-                    mod.CreateVector(0, 0, 0)
-                )
-
-                teamMap.set(sectorId, vo)
-            }
-
-            this.sectorVOModules.set(teamId, teamMap)
-        }
-    }
-
-    // -------------------------------------------------
-    // Capture point events (resolved by GameMode)
-    // -------------------------------------------------
-
-    OnCapturePointCapturedResolved(eventCapturePoint: mod.CapturePoint): void {
-        const cpId = mod.GetObjId(eventCapturePoint)
-
-        const currentOwner = mod.GetCurrentOwnerTeam(eventCapturePoint)
-        const previousOwner = mod.GetPreviousOwnerTeam(eventCapturePoint)
-
-        if (!currentOwner || !previousOwner) {
-            return
-        }
-
-        const currentOwnerId = mod.GetObjId(currentOwner)
-        const previousOwnerId = mod.GetObjId(previousOwner)
-
-        const flag = this.mapData.getFlagForCapturePoint(cpId)
-        if (!flag) {
-            return
-        }
-
-        const friendlyVO = this.capturePointVOModules
-            .get(currentOwnerId)
-            ?.get(cpId)
-
-        const enemyVO = this.capturePointVOModules
-            .get(previousOwnerId)
-            ?.get(cpId)
-
-        if (enemyVO) {
-            mod.PlayVO(
-                enemyVO,
-                mod.VoiceOverEvents2D.ObjectiveCapturedEnemy,
-                flag,
-                previousOwner
-            )
-        }
-
-        if (friendlyVO) {
-            mod.PlayVO(
-                friendlyVO,
-                mod.VoiceOverEvents2D.ObjectiveCaptured,
-                flag,
-                currentOwner
-            )
-        }
-    }
-
-    OnCapturePointLost(eventCapturePoint: mod.CapturePoint): void {
-        const cpId = mod.GetObjId(eventCapturePoint)
-
-        const previousOwner = mod.GetPreviousOwnerTeam(eventCapturePoint)
-        if (!previousOwner) {
-            return
-        }
-
-        const previousOwnerId = mod.GetObjId(previousOwner)
-
-        const flag = this.mapData.getFlagForCapturePoint(cpId)
-        if (!flag) {
-            return
-        }
-
-        const voModule = this.capturePointVOModules
-            .get(previousOwnerId)
-            ?.get(cpId)
-
-        if (!voModule) {
-            return
-        }
-
-        mod.PlayVO(
-            voModule,
-            mod.VoiceOverEvents2D.ObjectiveLost,
-            flag,
-            previousOwner
-        )
-    }
-
-    // -------------------------------------------------
-    // Capture interaction (contested)
-    // -------------------------------------------------
-
-    OnPlayerEnterCapturePoint(
-        eventPlayer: mod.Player,
-        eventCapturePoint: mod.CapturePoint
-    ): void {
-        const ownerTeam = mod.GetCurrentOwnerTeam(eventCapturePoint)
-        if (!ownerTeam) {
-            return
-        }
-
-        const ownerTeamId = mod.GetObjId(ownerTeam)
-        const playerTeam = mod.GetTeam(eventPlayer)
-        const playerTeamId = mod.GetObjId(playerTeam)
-
-        // Only when entering enemy-owned capture point
-        if (ownerTeamId === 0 || ownerTeamId === playerTeamId) {
-            return
-        }
-
-        const cpId = mod.GetObjId(eventCapturePoint)
-        const flag = this.mapData.getFlagForCapturePoint(cpId)
-        if (!flag) {
-            return
-        }
-
-        const enemyVO = this.capturePointVOModules.get(ownerTeamId)?.get(cpId)
-
-        const friendlyVO = this.capturePointVOModules
-            .get(playerTeamId)
-            ?.get(cpId)
-
-        if (enemyVO) {
-            mod.PlayVO(
-                enemyVO,
-                mod.VoiceOverEvents2D.ObjectiveContested,
-                flag,
-                ownerTeam
-            )
-        }
-
-        if (friendlyVO) {
-            mod.PlayVO(
-                friendlyVO,
-                mod.VoiceOverEvents2D.ObjectiveLockdownFriendly,
-                flag,
-                playerTeam
-            )
-        }
-    }
-
-    // -------------------------------------------------
-    // Sector events (resolved by GameMode)
-    // -------------------------------------------------
-
-    async OnSectorChanged(
-        previousSectorId: number,
-        currentSectorId: number,
-        teamId: number,
-        bufferTime: number
-    ): Promise<void> {
-        const attackerTeam = mod.GetTeam(teamId)
-        const defenderTeam = mod.GetTeam(teamId === 1 ? 2 : 1)
-
-        const attackerVO = this.sectorVOModules
-            .get(teamId)
-            ?.get(previousSectorId)
-
-        const defenderVO = this.sectorVOModules
-            .get(teamId === 1 ? 2 : 1)
-            ?.get(previousSectorId)
-
-        const flag = mod.VoiceOverFlags.Alpha
-
-        if (attackerVO) {
-            mod.PlayVO(
-                attackerVO,
-                mod.VoiceOverEvents2D.SectorTakenAttacker,
-                flag,
-                attackerTeam
-            )
-        }
-
-        if (defenderVO) {
-            mod.PlayVO(
-                defenderVO,
-                mod.VoiceOverEvents2D.SectorTakenDefender,
-                flag,
-                defenderTeam
-            )
-        }
-    }
-}
-
-// -------- FILE: src\GameModes\Pressure\Player\Components\PlayerUIComponent.ts --------
-/*
- * PlayerUIComponent
- *
- * Single UI composition root for a human player.
- * Owns all PRESSURE-specific UI and reacts to GameMode events.
- *
- * This component does NOT drive game logic.
- * It only reacts to already-finalized GameMode state.
- */
-export class PlayerUIComponent
-    implements CorePlayer_IComponent, IGameModeEvents
-{
-    private lp!: CorePlayer_APlayer
-    private gameMode!: PRSR_GameMode
-
-    private root!: mod.UIWidget
-
-    private sectorContainer!: mod.UIWidget
-    private sectorText!: mod.UIWidget
-    private sectorVisibleUntilMs = 0
-
-    private capturePointContainer!: mod.UIWidget
-    private capturePointText!: mod.UIWidget
-    private currentCapturePoint: mod.CapturePoint | null = null
-
-    private lastCapturePointLabelKey = 0
-
-    private static readonly CAPTURE_POINT_UI_DEBOUNCE_MS = 0.1
-    private capturePointUpdateToken = 0
-
-    // Countdown UI
-    private countdownText!: mod.UIWidget
-    private countdownEndAtMs = 0
-    private countdownLastSecond = -1
-
-    private readonly capturePointUiMap: {
-        [key: number]: { label: string; color: mod.Vector }
-    } = {
-        1: {
-            label: mod.stringkeys.gamemodes.PRSR.capturePoints.contested,
-            color: CoreUI_Colors.YellowLight,
-        },
-        2: {
-            label: mod.stringkeys.gamemodes.PRSR.capturePoints.defending,
-            color: CoreUI_Colors.White,
-        },
-        3: {
-            label: mod.stringkeys.gamemodes.PRSR.capturePoints.capturing,
-            color: CoreUI_Colors.BlueLight,
-        },
-        4: {
-            label: mod.stringkeys.gamemodes.PRSR.capturePoints.losing,
-            color: CoreUI_Colors.RedLight,
-        },
-    }
-
-    private readonly sectorUiMap: {
-        [key: number]: { label: string; color: mod.Vector }
-    } = {
-        1: {
-            label: mod.stringkeys.gamemodes.PRSR.sectors.taken,
-            color: CoreUI_Colors.BlueLight,
-        },
-        2: {
-            label: mod.stringkeys.gamemodes.PRSR.sectors.lost,
-            color: CoreUI_Colors.RedLight,
-        },
-    }
-
-    constructor(gameMode: PRSR_GameMode) {
-        this.gameMode = gameMode
-    }
-
-    // -------------------------------------------------
-    // Lifecycle
-    // -------------------------------------------------
+// -------- FILE: src\Core\Player\Components\Protection\ProtectionComponent.ts --------
+export class CorePlayer_ProtectionComponent implements CorePlayer_IComponent {
+    private ap!: CorePlayer_APlayer
+    private active: boolean = false
+    private deactivateAt: number = 0
 
     onAttach(ap: CorePlayer_APlayer): void {
-        this.lp = ap
-
-        this.createRoot()
-        this.createSectorText()
-        this.createCapturePointText()
-        this.createCountdownText()
+        this.ap = ap
 
         ap.addListener({
-            OngoingPlayer: () => this.tick(),
+            OngoingPlayer: () => {
+                if (!this.active) return
 
-            OnPlayerEnterCapturePoint: (eventCapturePoint) => {
-                this.currentCapturePoint = eventCapturePoint
-                mod.SetUIWidgetVisible(this.capturePointContainer, true)
-            },
-
-            OnPlayerExitCapturePoint: () => {
-                this.currentCapturePoint = null
-                this.lastCapturePointLabelKey = 0
-                mod.SetUIWidgetVisible(this.capturePointContainer, false)
+                if (this.deactivateAt > 0 && Date.now() >= this.deactivateAt) {
+                    this.deactivate()
+                }
             },
         })
-
-        this.gameMode.addListener(this)
     }
 
-    onDetach(): void {
-        this.gameMode.removeListener(this)
-        mod.DeleteUIWidget(this.root)
+    onDetach(ap: CorePlayer_APlayer): void {
+        this.active = false
+        this.deactivateAt = 0
     }
 
-    // -------------------------------------------------
-    // GameMode events
-    // -------------------------------------------------
+    activate(durationSec?: number): void {
+        this.active = true
 
-    OnSectorChanged(
-        currentSectorId: number,
-        previousSectorId: number,
-        teamId: number,
-        bufferTime: number
-    ): void {
-        const labelKey = this.lp.teamId === teamId ? 1 : 2
-        const uiState = this.sectorUiMap[labelKey]
+        mod.SetPlayerIncomingDamageFactor(this.ap.player, 0)
 
-        mod.SetUITextLabel(this.sectorText, mod.Message(uiState.label))
-        mod.SetUITextColor(this.sectorText, uiState.color)
-        mod.SetUIWidgetVisible(this.sectorContainer, true)
-
-        this.sectorVisibleUntilMs = Date.now() + bufferTime * 1000
-
-        // Example countdown (grace / buffer time)
-        this.showCountdown(bufferTime)
-    }
-
-    OngoingCapturePoint(eventCapturePoint: mod.CapturePoint): void {
-        if (
-            !this.currentCapturePoint ||
-            mod.GetObjId(eventCapturePoint) !==
-                mod.GetObjId(this.currentCapturePoint)
-        ) {
-            return
+        if (durationSec && durationSec > 0) {
+            this.deactivateAt = Date.now() + durationSec * 1000
+        } else {
+            this.deactivateAt = 0
         }
-
-        this.updateCapturePointState(eventCapturePoint)
     }
 
-    // -------------------------------------------------
-    // Capture point UI logic
-    // -------------------------------------------------
+    deactivate(): void {
+        this.active = false
+        this.deactivateAt = 0
 
-    private updateCapturePointState(capturePoint: mod.CapturePoint): void {
-        const playersOnPoint = mod.GetPlayersOnPoint(capturePoint)
-        const playersCount = mod.CountOf(playersOnPoint)
-
-        let myTeamCount = 0
-        let enemyTeamCount = 0
-
-        const myTeam = mod.GetTeam(this.lp.player)
-
-        for (let i = 0; i < playersCount; i++) {
-            const player = mod.ValueInArray(playersOnPoint, i) as mod.Player
-            const team = mod.GetTeam(player)
-
-            if (mod.GetObjId(team) === mod.GetObjId(myTeam)) {
-                myTeamCount++
-            } else {
-                enemyTeamCount++
-            }
-        }
-
-        const ownerTeam = mod.GetCurrentOwnerTeam(capturePoint)
-
-        let labelKey: number
-
-        switch (true) {
-            case myTeamCount === enemyTeamCount:
-                labelKey = 1
-                break
-
-            case myTeamCount > enemyTeamCount &&
-                mod.GetObjId(ownerTeam) === mod.GetObjId(myTeam):
-                labelKey = 2
-                break
-
-            case myTeamCount > enemyTeamCount:
-                labelKey = 3
-                break
-
-            default:
-                labelKey = 4
-        }
-
-        if (this.lastCapturePointLabelKey === labelKey) {
-            return
-        }
-
-        this.lastCapturePointLabelKey = labelKey
-        const uiState = this.capturePointUiMap[labelKey]
-
-        const token = ++this.capturePointUpdateToken
-        this.deferCapturePointLabel(uiState.label, uiState.color, token)
+        // BUG: setting 1 does NOT work
+        mod.SetPlayerIncomingDamageFactor(this.ap.player, 0.999)
     }
 
-    private async deferCapturePointLabel(
-        label: string,
-        color: mod.Vector,
-        token: number
-    ): Promise<void> {
-        await mod.Wait(PlayerUIComponent.CAPTURE_POINT_UI_DEBOUNCE_MS)
-
-        if (token !== this.capturePointUpdateToken) return
-        if (!this.currentCapturePoint) return
-
-        mod.SetUITextLabel(this.capturePointText, mod.Message(label))
-        mod.SetUITextColor(this.capturePointText, color)
-    }
-
-    // -------------------------------------------------
-    // Countdown UI
-    // -------------------------------------------------
-
-    private showCountdown(durationSec: number): void {
-        this.countdownEndAtMs = Date.now() + durationSec * 1000
-        this.countdownLastSecond = -1
-        mod.SetUIWidgetVisible(this.countdownText, true)
-    }
-
-    private hideCountdown(): void {
-        this.countdownEndAtMs = 0
-        this.countdownLastSecond = -1
-        mod.SetUIWidgetVisible(this.countdownText, false)
-    }
-
-    // -------------------------------------------------
-    // UI creation
-    // -------------------------------------------------
-
-    private createRoot(): void {
-        mod.AddUIContainer(
-            'player_ui_root_' + this.lp.id,
-            mod.CreateVector(0, 0, 0),
-            mod.CreateVector(1920, 1080, 0),
-            mod.UIAnchor.TopLeft,
-            mod.GetUIRoot(),
-            true,
-            0,
-            mod.CreateVector(0, 0, 0),
-            1,
-            mod.UIBgFill.None,
-            mod.UIDepth.AboveGameUI,
-            this.lp.player
-        )
-
-        this.root = mod.FindUIWidgetWithName('player_ui_root_' + this.lp.id)
-    }
-
-    private createSectorText(): void {
-        mod.AddUIContainer(
-            'sector_container_' + this.lp.id, // name: string,
-            mod.CreateVector(0, 80, 0), // position: Vector,
-            mod.CreateVector(1920, 140, 0), // size: Vector,
-            mod.UIAnchor.TopCenter, // anchor: UIAnchor,
-            this.root, // parent: UIWidget,
-            false, // visible: boolean,
-            0, // padding: number,
-            mod.CreateVector(0.9, 0.9, 0.9), // bgColor: Vector,
-            1, // bgAlpha: number,
-            mod.UIBgFill.Blur // bgFill: UIBgFill
-        )
-
-        this.sectorContainer = mod.FindUIWidgetWithName(
-            'sector_container_' + this.lp.id
-        )
-
-        mod.AddUIText(
-            'sector_text_' + this.lp.id,
-            mod.CreateVector(0, 10, 0),
-            mod.CreateVector(1920, 80, 0),
-            mod.UIAnchor.TopLeft,
-            this.sectorContainer,
-            true,
-            0,
-            CoreUI_Colors.Black,
-            1,
-            mod.UIBgFill.None,
-            mod.Message(1),
-            80,
-            CoreUI_Colors.White,
-            0.8,
-            mod.UIAnchor.TopCenter
-        )
-
-        this.sectorText = mod.FindUIWidgetWithName('sector_text_' + this.lp.id)
-    }
-
-    private createCapturePointText(): void {
-        mod.AddUIContainer(
-            'capture_point_container_' + this.lp.id, // name: string,
-            mod.CreateVector(0, 80, 0), // position: Vector,
-            mod.CreateVector(464, 140, 0), // size: Vector,
-            mod.UIAnchor.TopCenter, // anchor: UIAnchor,
-            this.root, // parent: UIWidget,
-            false, // visible: boolean,
-            0, // padding: number,
-            mod.CreateVector(0.9, 0.9, 0.9), // bgColor: Vector,
-            1, // bgAlpha: number,
-            mod.UIBgFill.Blur // bgFill: UIBgFill
-        )
-
-        this.capturePointContainer = mod.FindUIWidgetWithName(
-            'capture_point_container_' + this.lp.id
-        )
-
-        mod.AddUIText(
-            'capture_point_title_' + this.lp.id,
-            mod.CreateVector(0, 20, 0),
-            mod.CreateVector(400, 30, 0),
-            mod.UIAnchor.TopCenter,
-            this.capturePointContainer,
-            true,
-            0,
-            mod.CreateVector(0, 0, 0),
-            1,
-            mod.UIBgFill.None,
-            mod.Message('gamemodes.PRSR.capturePoint'),
-            30,
-            CoreUI_Colors.White,
-            0.5,
-            mod.UIAnchor.TopCenter
-        )
-
-        mod.AddUIText(
-            'capture_point_text_' + this.lp.id,
-            mod.CreateVector(0, 40, 0),
-            mod.CreateVector(400, 80, 0),
-            mod.UIAnchor.TopCenter,
-            this.capturePointContainer,
-            true,
-            0,
-            mod.CreateVector(0, 0, 0),
-            1,
-            mod.UIBgFill.None,
-            mod.Message(1),
-            80,
-            CoreUI_Colors.White,
-            0.8,
-            mod.UIAnchor.TopCenter
-        )
-
-        this.capturePointText = mod.FindUIWidgetWithName(
-            'capture_point_text_' + this.lp.id
-        )
-    }
-
-    private createCountdownText(): void {
-        mod.AddUIText(
-            'countdown_text_' + this.lp.id,
-            mod.CreateVector(0, 90, 0),
-            mod.CreateVector(1920, 30, 0),
-            mod.UIAnchor.TopLeft,
-            this.sectorContainer,
-            false,
-            0,
-            CoreUI_Colors.Black,
-            1,
-            mod.UIBgFill.None,
-            mod.Message(1),
-            30,
-            CoreUI_Colors.White,
-            0.6,
-            mod.UIAnchor.TopCenter
-        )
-
-        this.countdownText = mod.FindUIWidgetWithName(
-            'countdown_text_' + this.lp.id
-        )
-    }
-
-    // -------------------------------------------------
-    // Tick
-    // -------------------------------------------------
-
-    private tick(): void {
-        if (this.sectorVisibleUntilMs !== 0) {
-            if (mod.GetUIWidgetVisible(this.capturePointContainer)) {
-                mod.SetUIWidgetVisible(this.capturePointContainer, false)
-            }
-
-            if (Date.now() >= this.sectorVisibleUntilMs) {
-                mod.SetUIWidgetVisible(this.sectorContainer, false)
-
-                if (this.currentCapturePoint) {
-                    mod.SetUIWidgetVisible(this.capturePointContainer, true)
-                }
-
-                this.sectorVisibleUntilMs = 0
-            }
-        }
-
-        if (this.countdownEndAtMs === 0) return
-
-        const remainingMs = this.countdownEndAtMs - Date.now()
-        const remainingSec = Math.ceil(remainingMs / 1000)
-
-        if (remainingSec <= 0) {
-            this.hideCountdown()
-            return
-        }
-
-        if (remainingSec !== this.countdownLastSecond) {
-            this.countdownLastSecond = remainingSec
-            mod.SetUITextLabel(
-                this.countdownText,
-                mod.Message(
-                    `gamemodes.PRSR.sectors.countdown`,
-                    remainingSec
-                )
-            )
-        }
+    isActive(): boolean {
+        return this.active
     }
 }
 
-// -------- FILE: src\GameModes\Pressure\PRSR_GameMode.ts --------
-// Orchestrates Pressure gameplay while delegating VO playback to VOService.
-/**
- * GameMode
- *
- * Orchestrates Breakthrough gameplay.
- * Uses Core_AGameMode event system.
- * Emits Pressure-specific events.
- */
-export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
-    private CAPTURE_POINT_TIME = 6
-    private BOTS_UNSPAWN_DELAY = 10
+// -------- FILE: src\GameModes\Playground\Player\Player.ts --------
+export class Player extends CorePlayer_APlayer {
+    protectionComp: CorePlayer_ProtectionComponent
 
-    protected declare playerManager: PlayerManager
+    constructor(player: mod.Player) {
+        super(player)
 
-    private squadManager: Core_SquadManager | null = null
-    public mapData!: MapDataService
+        this.protectionComp = new CorePlayer_ProtectionComponent()
+        this.addComponent(this.protectionComp)
 
-    private currentSectorId = 0
+        this.addListener({
+            OnPlayerDeployed: () => {
+                // spawn protection
+                this.isLogicalAI()
+                    ? this.protectionComp.activate(5)
+                    : this.protectionComp.activate(5)
 
+                const brainComp = this.getComponent(CorePlayer_BrainComponent)
+                if (brainComp) {
+                    brainComp.brain.installProfile(PG_GameMode.infantryProfile)
+                }
+
+                // mod.SetCameraTypeForPlayer(this.player, mod.Cameras.ThirdPerson)
+                // mod.AIEnableShooting(this.player, false)
+            },
+
+            OnPlayerEnterVehicleSeat: (eventVehicle, eventSeat) => {
+                const brainComp = this.getComponent(CorePlayer_BrainComponent)
+                if (brainComp) {
+                    if (mod.GetPlayerVehicleSeat(this.player) !== 0) {
+                        return
+                    }
+
+                    brainComp.brain.installProfile(PG_GameMode.driverProfile)
+                }
+            },
+
+            OnPlayerExitVehicle: (eventVehicle) => {
+                const brainComp = this.getComponent(CorePlayer_BrainComponent)
+                if (brainComp) {
+                    brainComp.brain.installProfile(PG_GameMode.infantryProfile)
+                }
+            },
+        })
+    }
+}
+
+// -------- FILE: src\GameModes\Playground\Player\PlayerManager.ts --------
+export class PlayerManager extends CorePlayer_APlayerManager {
+    constructor() {
+        super(Player)
+    }
+}
+
+// -------- FILE: src\GameModes\Playground\Services\CapturePointTimeService.ts --------
+export class CapturePointTimeService {
     private readonly captureProgressMap = new Map<
         number,
         {
             captureProgress: number
-            isCapturing: boolean
+            isCapturing: boolean | null
         }
     >()
 
-    // -------------------------------------------------
-    // Player manager
-    // -------------------------------------------------
-
-    protected createPlayerManager(): CorePlayer_APlayerManager {
-        return new PlayerManager()
+    constructor(
+        private readonly gameMode: PG_GameMode,
+        private readonly time: number = 3
+    ) {
+        this.gameMode.addListener(this)
     }
 
-    // -------------------------------------------------
-    // Game mode lifecycle
-    // -------------------------------------------------
-
-    protected override async OnGameModeStarted(): Promise<void> {
-        mod.SetScoreboardType(mod.ScoreboardType.CustomTwoTeams)
-        mod.SetScoreboardColumnNames(
-            mod.Message(`gamemodes.PRSR.scoreboard.score`),
-            mod.Message(`gamemodes.PRSR.scoreboard.kills`),
-            mod.Message(`gamemodes.PRSR.scoreboard.deaths`),
-            mod.Message(`gamemodes.PRSR.scoreboard.teamKills`),
-            mod.Message(`gamemodes.PRSR.scoreboard.killStreak`)
-        )
-
-        mod.SetGameModeTargetScore(1)
-        mod.SetScoreboardColumnWidths(1, 0.5, 0.5, 0.5, 0.5)
-
-        mod.SetFriendlyFire(true)
-        mod.SetGameModeTimeLimit(1200)
-        mod.SetAIToHumanDamageModifier(2)
-        mod.SetSpawnMode(mod.SpawnModes.Deploy)
-
-        this.mapData = new MapDataService()
-        new VOService(this, this.mapData)
-
-        this.initBots()
-        this.initSectors()
-    }
-
-    // -------------------------------------------------
-    // Player join / leave
-    // -------------------------------------------------
-
-    protected override OnLogicalPlayerJoinGame(lp: CorePlayer_APlayer): void {
-        // mod.SetTeam(lp.player, mod.GetTeam(2))
-
-        if (!lp.isAI()) {
-            lp.addComponent(new PlayerUIComponent(this))
-        }
-
-        // Set AI Brain
-        if (lp.isLogicalAI()) {
-            const brain = new CoreAI_Brain(
-                lp.player,
-                new CoreAI_CombatantProfile({
-                    arrivalSensor: {
-                        getWPs: () => this.getDefendWPs(),
-                        ttlMs: 10000,
-                    },
-                    moveToCapturePointSensor: {
-                        getCapturePoints: () =>
-                            this.mapData.getAllCapturePointsInSector(
-                                this.currentSectorId
-                            ),
-                    },
-                })
-            )
-
-            lp.addComponent(new BrainComponent(brain))
-        }
-
-        if (!this.squadManager) {
-            this.squadManager = new Core_SquadManager(this, 2)
-        }
-
-        this.squadManager.addToSquad(lp)
-    }
-
-    protected override OnPlayerLeaveGame(eventNumber: number): void {
-        const lp = this.playerManager.getById(eventNumber)
-        if (!lp) return
-
-        // Respawn persistent bot
-        if (lp.isLogicalAI()) {
-            this.playerManager.respawnLogicalBot(
-                lp,
-                this.mapData.getBotSpawnPos(this.currentSectorId, lp.teamId),
-                this.BOTS_UNSPAWN_DELAY
-            )
-        }
-    }
-
-    protected override async OnPlayerInteract(
-        eventPlayer: mod.Player,
-        eventInteractPoint: mod.InteractPoint
-    ): Promise<void> {
-        mod.EnableInteractPoint(eventInteractPoint, false)
-        await mod.Wait(30)
-        mod.EnableInteractPoint(eventInteractPoint, true)
-    }
-
-    // -------------------------------------------------
-    // Capture interaction
-    // -------------------------------------------------
-
-    protected override OnCapturePointCaptured(
-        eventCapturePoint: mod.CapturePoint
-    ): void {
-        const cpId = mod.GetObjId(eventCapturePoint)
-
-        const ownerTeam = mod.GetCurrentOwnerTeam(eventCapturePoint)
-        const ownerTeamId = mod.GetObjId(ownerTeam)
-
-        // BUG: need to set true first or false will not work
-        mod.EnableCapturePointDeploying(eventCapturePoint, true)
-        mod.EnableCapturePointDeploying(eventCapturePoint, false)
-
-        // Sector not fully controlled
-        if (
-            !this.mapData.doesTeamControlEntireSector(
-                this.currentSectorId,
-                ownerTeamId
-            )
-        ) {
-            this.emitCustom('OnCapturePointCapturedResolved', eventCapturePoint)
-            return
-        }
-
-        // Win condition
-        if (this.mapData.getWinCapturePointId(ownerTeamId) === cpId) {
-            mod.SetGameModeScore(ownerTeam, 1)
-            return
-        }
-
-        const nextSectorId = this.mapData.getNextSectorId(
-            this.currentSectorId,
-            ownerTeamId
-        )
-
-        if (nextSectorId === null || nextSectorId === this.currentSectorId) {
-            return
-        }
-
-        // Graceful transition
-        this.mapData.disableSector(this.currentSectorId, ownerTeamId)
-
-        const bufferHQ = this.mapData.getSectorBufferHQId(this.currentSectorId)
-        if (bufferHQ) {
-            this.enableSectorBufferHQ(bufferHQ, 10)
-        }
-
-        const previousSectorId = this.currentSectorId
-        this.currentSectorId = nextSectorId
-        this.mapData.enableSector(this.currentSectorId)
-
-        this.emitCustom(
-            'OnSectorChanged',
-            this.currentSectorId,
-            previousSectorId,
-            ownerTeamId,
-            10
-        )
-    }
-
-    protected override OngoingCapturePoint(
-        eventCapturePoint: mod.CapturePoint
-    ): void {
+    OngoingCapturePoint(eventCapturePoint: mod.CapturePoint): void {
         const captureProgress = mod.GetCaptureProgress(eventCapturePoint)
 
         if (captureProgress === 0 || captureProgress === 1) {
@@ -6106,24 +4495,22 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
 
         const capturePointId = mod.GetObjId(eventCapturePoint)
 
-        const captureProgressMapEntry =
-            this.captureProgressMap.get(capturePointId)
+        let entry = this.captureProgressMap.get(capturePointId)
 
-        const entry = captureProgressMapEntry ?? {
-            captureProgress,
-            isCapturing: true,
-        }
-
-        if (!captureProgressMapEntry) {
+        if (!entry) {
+            entry = {
+                captureProgress,
+                isCapturing: null,
+            }
             this.captureProgressMap.set(capturePointId, entry)
         }
 
         if (captureProgress < entry.captureProgress) {
             // Neutralization
-            if (entry.isCapturing) {
+            if (entry.isCapturing !== false) {
                 mod.SetCapturePointNeutralizationTime(
                     eventCapturePoint,
-                    this.CAPTURE_POINT_TIME
+                    this.time
                 )
             }
 
@@ -6133,11 +4520,8 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
             })
         } else {
             // Capturing
-            if (!entry.isCapturing) {
-                mod.SetCapturePointCapturingTime(
-                    eventCapturePoint,
-                    this.CAPTURE_POINT_TIME
-                )
+            if (entry.isCapturing !== true) {
+                mod.SetCapturePointCapturingTime(eventCapturePoint, this.time)
             }
 
             this.captureProgressMap.set(capturePointId, {
@@ -6146,57 +4530,147 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
             })
         }
     }
+}
 
-    // Bot spawning
+// -------- FILE: src\GameModes\Playground\PG_GameMode.ts --------
+export class PG_GameMode extends Core_AGameMode {
+    protected override createPlayerManager(): CorePlayer_APlayerManager {
+        return new PlayerManager()
+    }
 
-    private async initBots(): Promise<void> {
-        await mod.Wait(5)
+    private AI_UNSPAWN_DELAY = 10
+    private AI_COUNT_TEAM_1 = 1
+    private AI_COUNT_TEAM_2 = 0
 
-        const team1Count = this.mapData.getBotCount(1)
-        const team2Count = this.mapData.getBotCount(2)
+    private squadManager: Core_SquadManager | null = null
 
-        for (let i = 1; i <= team1Count; i++) {
-            this.playerManager.spawnLogicalBot(
-                mod.SoldierClass.Assault,
-                1,
-                this.mapData.getBotSpawnPos(this.currentSectorId, 1),
-                mod.Message(`core.ai.bots.${i}`),
-                this.BOTS_UNSPAWN_DELAY
+    public static infantryProfile: CoreAI_BaseProfile =
+        new CoreAI_CombatantProfile({
+            fightSensor: {
+                ttlMs: 10_000,
+            },
+            closestEnemySensor: {},
+            /* roamSensor: {
+                getWPs: () => PG_GameMode.getRangeWPs(1000, 1010),
+                ttlMs: 4_000,
+            }, */
+            vehicleToDriveSensor: {
+                radius: 100,
+            },
+            capturePointSensor: {},
+        })
+
+    public static driverProfile: CoreAI_BaseProfile =
+        new CoreAI_CombatantProfile({
+            fightSensor: {
+                ttlMs: 10_000,
+            },
+            roamSensor: {
+                getWPs: () => PG_GameMode.getRangeWPs(1106, 1107),
+                ttlMs: 60_000,
+            },
+            capturePointSensor: {},
+            /* arrivalSensor: {
+                getWPs: () => this.getRangeWPs(1106, 1107),
+                ttlMs: 20_000,
+                cooldownMs: 40_000,
+            }, */
+        })
+
+    protected override OnGameModeStarted(): void {
+        // One-time game setup (rules, scoreboard, AI bootstrap)
+        // mod.SetAIToHumanDamageModifier(2)
+        mod.SetFriendlyFire(true)
+        new CapturePointTimeService(this, 5)
+
+        // mod.EnableGameModeObjective(mod.GetCapturePoint(2), false)
+
+        mod.SetCapturePointOwner(mod.GetCapturePoint(1), mod.GetTeam(2))
+        mod.SetCapturePointOwner(mod.GetCapturePoint(2), mod.GetTeam(128))
+        console.log(
+            mod.GetObjId(mod.GetCurrentOwnerTeam(mod.GetCapturePoint(2)))
+        )
+
+        // Spawn initial logical bots
+        for (let i = 1; i <= this.AI_COUNT_TEAM_1; i++) {
+            mod.Wait(1).then(() =>
+                this.playerManager.spawnLogicalBot(
+                    mod.SoldierClass.Engineer,
+                    1,
+                    mod.GetObjectPosition(mod.GetHQ(1)),
+                    mod.Message(`core.ai.bots.${i}`),
+                    this.AI_UNSPAWN_DELAY
+                )
             )
-            await mod.Wait(1)
         }
 
-        for (let j = 1; j <= team2Count; j++) {
-            this.playerManager.spawnLogicalBot(
-                mod.SoldierClass.Assault,
-                2,
-                this.mapData.getBotSpawnPos(this.currentSectorId, 2),
-                mod.Message(`core.ai.bots.${team1Count + j}`),
-                this.BOTS_UNSPAWN_DELAY
+        for (let j = 1; j <= this.AI_COUNT_TEAM_2; j++) {
+            mod.Wait(1).then(() =>
+                this.playerManager.spawnLogicalBot(
+                    mod.SoldierClass.Engineer,
+                    2,
+                    mod.GetObjectPosition(mod.GetHQ(2)),
+                    mod.Message(`core.ai.bots.${this.AI_COUNT_TEAM_1 + j}`),
+                    this.AI_UNSPAWN_DELAY
+                )
             )
-            await mod.Wait(1)
         }
     }
 
-    private initSectors() {
-        this.mapData.disableAllSectors()
-        this.currentSectorId = this.mapData.getInitSectorId()
-        this.mapData.enableSector(this.currentSectorId)
-    }
+    /*
+     *
+     */
 
-    private async enableSectorBufferHQ(
-        bufferHQId: number,
-        duration: number
+    protected override async OnLogicalPlayerJoinGame(
+        lp: CorePlayer_APlayer
     ): Promise<void> {
-        mod.SetHQTeam(mod.GetHQ(bufferHQId), mod.GetTeam(1))
-        await mod.Wait(duration)
-        mod.SetHQTeam(mod.GetHQ(bufferHQId), mod.GetTeam(0))
+        // Attach AI brain to logical AI players only
+        if (lp.isAI()) {
+            /* if (lp.teamId === 1) {
+                await mod.Wait(5)
+                mod.ForcePlayerToSeat(lp.player, this.vehicle!, -1)
+            } */
+
+            const brain = new CoreAI_Brain(
+                lp.player,
+                PG_GameMode.infantryProfile,
+                true
+            )
+
+            lp.addComponent(new CorePlayer_BrainComponent(brain))
+        }
+
+        // Ensure squad system exists and register the player
+        if (!this.squadManager) {
+            this.squadManager = new Core_SquadManager(this, 2)
+        }
+
+        // this.squadManager.addToSquad(lp)
     }
 
-    private getDefendWPs(): mod.Vector[] {
-        return this.mapData
-            .getAllCapturePointIds()
-            .map((id) => mod.GetObjectPosition(mod.GetCapturePoint(id)))
+    protected override OnPlayerLeaveGame(eventNumber: number): void {
+        const lp = this.playerManager.getById(eventNumber)
+        if (!lp) return
+
+        // Keep logical AI persistent by respawning its identity
+        if (lp.isLogicalAI()) {
+            this.playerManager.respawnLogicalBot(
+                lp,
+                mod.GetObjectPosition(mod.GetHQ(lp.teamId)),
+                this.AI_UNSPAWN_DELAY
+            )
+        }
+    }
+
+    private static getRangeWPs(from: number, to: number): mod.Vector[] {
+        const out: mod.Vector[] = []
+
+        for (let id = from; id <= to; id++) {
+            const wp = mod.GetSpatialObject(id)
+            out.push(mod.GetObjectPosition(wp))
+        }
+
+        return out
     }
 }
 
@@ -6269,11 +4743,11 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
  * separation between routing and gameplay code, unify PlayerManager access,
  * and ensure that custom game modes behave consistently with the engine rules.
  */
-// import { PG_GameMode } from './GameModes/Playground/PG_GameMode'
+// import { PRSR_GameMode } from './GameModes/Pressure/PRSR_GameMode'
 // import { TPL_GameMode } from './GameModes/Template/TPL_GameMode'
 // import { TDM_GameMode } from './GameModes/TDM/TDM_GameMode'
 
-const gameMode: Core_AGameMode = new PRSR_GameMode()
+const gameMode: Core_AGameMode = new PG_GameMode()
 
 // This will trigger every engine tick while the gamemode is running.
 export function OngoingGlobal(): void {

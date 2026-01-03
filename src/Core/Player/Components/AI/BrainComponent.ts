@@ -1,8 +1,8 @@
 // src/Core/AI/Components/BrainComponent.ts
 
-import { CorePlayer_APlayer } from '../../Player/APlayer'
-import { CorePlayer_IComponent } from '../../Player/APlayer'
-import { CoreAI_Brain } from '../Brain'
+import { CorePlayer_APlayer } from '../../APlayer'
+import { CorePlayer_IComponent } from '../../APlayer'
+import { CoreAI_Brain } from '../../../AI/Brain'
 
 /**
  * BrainComponent
@@ -10,7 +10,7 @@ import { CoreAI_Brain } from '../Brain'
  * AI behavior component attached to a logical player.
  * Created and configured by GameMode.
  */
-export class BrainComponent implements CorePlayer_IComponent {
+export class CorePlayer_BrainComponent implements CorePlayer_IComponent {
     public readonly brain: CoreAI_Brain
 
     private ap!: CorePlayer_APlayer
@@ -31,11 +31,20 @@ export class BrainComponent implements CorePlayer_IComponent {
                 if (!other) return
                 this.brain.onDamaged(other.player, damageType, weapon)
             },
+            OnRayCastHit: (eventPoint, eventNormal) => {
+                this.brain.onRayCastHit(eventPoint, eventNormal)
+            },
             OnAIMoveToSucceeded: () => {
                 this.brain.onMoveFinished(true)
             },
             OnAIMoveToFailed: () => {
                 this.brain.onMoveFinished(false)
+            },
+            OnPlayerDied: () => {
+                this.brain.reset()
+            },
+            OnPlayerUndeploy: () => {
+                this.brain.reset()
             },
         })
     }

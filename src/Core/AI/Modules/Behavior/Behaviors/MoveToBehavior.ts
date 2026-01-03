@@ -1,13 +1,12 @@
 import { CoreAI_ABehavior } from './ABehavior'
 import { CoreAI_Brain } from '../../../Brain'
-
-type CoreAI_MoveToMode = 'onfoot' | 'driver'
+import { CoreAI_BehaviorMode } from '../BehaviorController'
 
 /**
  * MoveToBehavior:
  * - Starts movement in enter()
- * - Runs as long as memory.moveToPos exists
- * - Stopped automatically when TTL clears moveToPos
+ * - Runs as long as memory.roamPos exists
+ * - Stopped automatically when TTL clears roamPos
  * - Optional target enables AISetTarget during movement
  * - Mode selects on-foot or driver logic (never both)
  *
@@ -16,76 +15,90 @@ type CoreAI_MoveToMode = 'onfoot' | 'driver'
 export class CoreAI_MoveToBehavior extends CoreAI_ABehavior {
     public name = 'moveto'
 
-    private readonly targetPos: mod.Vector
+    private roamPos: mod.Vector
     private readonly speed: mod.MoveSpeed
-    private readonly target: mod.Player | null
-    private readonly mode: CoreAI_MoveToMode
+    private readonly mode: CoreAI_BehaviorMode
+    private readonly arrivalDist: number
+    private readonly isValidated: boolean
 
     constructor(
         brain: CoreAI_Brain,
         pos: mod.Vector,
-        speed: mod.MoveSpeed,
-        target: mod.Player | null = null,
-        mode: CoreAI_MoveToMode = 'onfoot'
+        speed: mod.MoveSpeed = mod.MoveSpeed.Run,
+        mode: CoreAI_BehaviorMode = 'onFoot',
+        arrivalDist: number = 3,
+        isValidated: boolean = true
     ) {
         super(brain)
-        this.targetPos = pos
+        this.roamPos = pos
         this.speed = speed
-        this.target = target
         this.mode = mode
+        this.arrivalDist = arrivalDist
+        this.isValidated = isValidated
     }
 
-    override async enter(): Promise<void> {
-        /* console.log(
-            mod.XComponentOf(this.targetPos),
-            ' ',
-            mod.YComponentOf(this.targetPos),
-            ' ',
-            mod.ZComponentOf(this.targetPos)
-        ) */
+    public getTargetPos(): mod.Vector {
+        return this.roamPos
+    }
 
+    override enter(): void {
         const player = this.brain.player
-        if (!mod.IsPlayerValid(player)) return
-
-        if (this.target && mod.IsPlayerValid(this.target)) {
-            mod.AISetTarget(player, this.target)
-        } else {
-            mod.AISetTarget(player)
+        if (!mod.IsPlayerValid(player)) {
+            return
         }
 
-        if (this.mode === 'driver') {
-            await this.enterDriverMove(player)
+        if (this.mode === 'onDrive') {
+            this.enterOnDriveMove(player)
             return
         }
 
         this.enterOnFootMove(player)
     }
 
-    private async enterDriverMove(player: mod.Player): Promise<void> {
+    private async enterOnDriveMove(player: mod.Player): Promise<void> {
         const vehicle = mod.GetVehicleFromPlayer(player)
-        if (!vehicle) return
 
         mod.ForcePlayerExitVehicle(player, vehicle)
         await mod.Wait(0)
         await mod.Wait(0)
         mod.ForcePlayerToSeat(player, vehicle, 0)
-        mod.AIDefendPositionBehavior(player, this.targetPos, 0, 10)
+        mod.AISetMoveSpeed(player, mod.MoveSpeed.Sprint)
+        // mod.AIBattlefieldBehavior(player)
+        mod.AIDefendPositionBehavior(player, this.roamPos, 0, 4)
         // mod.AIValidatedMoveToBehavior(player, this.targetPos)
     }
 
     private enterOnFootMove(player: mod.Player): void {
         mod.AISetMoveSpeed(player, this.speed)
-        mod.AIValidatedMoveToBehavior(player, this.targetPos)
+        this.isValidated
+            ? mod.AIValidatedMoveToBehavior(player, this.roamPos)
+            : mod.AIMoveToBehavior(player, this.roamPos)
     }
 
     override update(): void {
-        // Nothing needed here anymore.
-        // TTL in memory determines when this behavior stops being selected.
+        const player = this.brain.player
+        if (!mod.IsPlayerValid(player)) return
+
+        const memPos = this.brain.memory.get('roamPos')
+        if (!memPos) return
+
+        /* 
+        // Conflicts with other Scores
+        if (!mod.Equals(memPos, this.roamPos)) {
+            this.roamPos = memPos
+            this.enter()
+        } */
+
+        const myPos = mod.GetObjectPosition(player)
+        const dist = mod.DistanceBetween(myPos, this.roamPos)
+        const arrivalDist = this.arrivalDist
+
+        if (dist < arrivalDist) {
+            this.brain.memory.set('roamPos', null)
+        }
     }
 
     override exit(): void {
-        if (this.target && mod.IsPlayerValid(this.brain.player)) {
-            mod.AISetTarget(this.brain.player)
-        }
+        // No target cleanup here; targeting is managed by the brain.
     }
 }

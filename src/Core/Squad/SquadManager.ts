@@ -1,10 +1,10 @@
 import { CorePlayer_APlayer } from '../Player/APlayer'
-import { CoreAI_Squad } from './Squad'
+import { Core_Squad } from './Squad'
 import { Core_AGameMode } from '../AGameMode'
 
 export class Core_SquadManager {
     private gameMode: Core_AGameMode
-    private squads: CoreAI_Squad[] = []
+    private squads: Core_Squad[] = []
     private maxSlots: number
 
     constructor(gameMode: Core_AGameMode, maxSlots: number = 4) {
@@ -15,7 +15,7 @@ export class Core_SquadManager {
     /* ------------------------------------------------------------
      * Player Join
      * ------------------------------------------------------------ */
-    async addToSquad(ap: CorePlayer_APlayer): Promise<CoreAI_Squad> {
+    async addToSquad(ap: CorePlayer_APlayer): Promise<Core_Squad> {
         const teamId = mod.GetObjId(mod.GetTeam(ap.player))
 
         // Find squad with same team + free slots
@@ -25,7 +25,7 @@ export class Core_SquadManager {
 
         // Create new squad if no free one exists
         if (!squad) {
-            squad = new CoreAI_Squad(this.gameMode, teamId, this.maxSlots)
+            squad = new Core_Squad(this.gameMode, teamId, this.maxSlots)
             this.squads.push(squad)
         }
 
@@ -48,15 +48,15 @@ export class Core_SquadManager {
     /* ------------------------------------------------------------
      * Helpers
      * ------------------------------------------------------------ */
-    getSquad(ap: CorePlayer_APlayer): CoreAI_Squad | undefined {
+    getSquad(ap: CorePlayer_APlayer): Core_Squad | undefined {
         return this.squads.find((s) => s.getMembers().includes(ap))
     }
 
-    getSquadsByTeam(teamId: number): CoreAI_Squad[] {
+    getSquadsByTeam(teamId: number): Core_Squad[] {
         return this.squads.filter((s) => s.getTeamId() === teamId)
     }
 
-    getAllSquads(): CoreAI_Squad[] {
+    getAllSquads(): Core_Squad[] {
         return this.squads
     }
 }

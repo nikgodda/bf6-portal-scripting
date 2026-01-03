@@ -108,10 +108,14 @@ export class CoreAI_Brain {
 
     onDeployed(): void {}
 
-    onDied(): void {
+    reset(): void {
         this.perception.reset()
         this.memory.reset()
         this.behaviorController.resetAll()
+
+        if (mod.IsPlayerValid(this.player)) {
+            mod.AISetTarget(this.player)
+        }
     }
 
     onUndeploy(): void {}
@@ -121,9 +125,7 @@ export class CoreAI_Brain {
      * ------------------------------------------------------------ */
 
     onMoveFinished(success: boolean): void {
-        // mod.DisplayHighlightedWorldLogMessage(mod.Message(454))
-
-        this.memory.set('moveToPos', null)
+        this.memory.set('roamPos', null)
         this.emit('OnMoveFinished', success)
     }
 
@@ -154,6 +156,23 @@ export class CoreAI_Brain {
     }
 
     /* ------------------------------------------------------------
+     * Raycast hit event
+     * ------------------------------------------------------------ */
+
+    onRayCastHit(eventPoint: mod.Vector, eventNormal: mod.Vector): void {
+        const fightSensor = this.getSensor(CoreAI_FightSensor)
+        if (!fightSensor) return
+
+        const sensorCtx: CoreAI_SensorContext = {
+            player: this.player,
+            memory: this.memory,
+            time: this.memory.time,
+        }
+
+        fightSensor.onRayCastHit?.(sensorCtx, eventPoint, eventNormal)
+    }
+
+    /* ------------------------------------------------------------
      * Tick (called by BrainComponent)
      * ------------------------------------------------------------ */
 
@@ -168,6 +187,13 @@ export class CoreAI_Brain {
             !mod.GetSoldierState(this.player, mod.SoldierStateBool.IsAlive)
         ) {
             return
+        }
+
+        const enemy = this.memory.get('closestEnemy')
+        if (enemy && mod.IsPlayerValid(enemy)) {
+            mod.AISetTarget(this.player, enemy)
+        } else {
+            mod.AISetTarget(this.player)
         }
 
         const sensorCtx: CoreAI_SensorContext = {

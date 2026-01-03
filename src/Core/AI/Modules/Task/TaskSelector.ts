@@ -1,6 +1,7 @@
 import { CoreAI_Brain } from '../../Brain'
 import { CoreAI_AProfile } from '../../Profiles/AProfile'
 import { CoreAI_IdleBehavior } from '../Behavior/Behaviors/IdleBehavior'
+import { CoreAI_MoveToBehavior } from '../Behavior/Behaviors/MoveToBehavior'
 import { CoreAI_ITaskScoringEntry } from './ITaskScoringEntry'
 
 export class CoreAI_TaskSelector {
@@ -23,7 +24,8 @@ export class CoreAI_TaskSelector {
         let bestScore = -Infinity
 
         // Evaluate profile scoring
-        for (const entry of this.profile.scoring) {
+        for (let i = 0; i < this.profile.scoring.length; i++) {
+            const entry = this.profile.scoring[i]
             const score = entry.score(this.brain)
             if (score > bestScore) {
                 bestScore = score
@@ -43,12 +45,23 @@ export class CoreAI_TaskSelector {
         const temp = bestEntry.factory(this.brain)
         const nextClass = temp.constructor
 
-        // If same class -> never switch (no restarts)
+        // If same class -> don't switch (no restarts), except MoveTo when target changes.
         if (current && current.constructor === nextClass) {
-            return current
+            if (
+                current instanceof CoreAI_MoveToBehavior &&
+                temp instanceof CoreAI_MoveToBehavior
+            ) {
+                const currentPos = current.getTargetPos()
+                const nextPos = temp.getTargetPos()
+                if (mod.DistanceBetween(currentPos, nextPos) <= 0) {
+                    return current
+                }
+            } else {
+                return current
+            }
         }
 
-        // Switch to new class
-        return bestEntry.factory(this.brain)
+        // Switch to new instance
+        return temp
     }
 }

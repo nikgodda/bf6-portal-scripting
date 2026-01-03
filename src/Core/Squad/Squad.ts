@@ -1,9 +1,9 @@
 import { Core_AGameMode } from '../AGameMode'
 import { CorePlayer_APlayer } from '../Player/APlayer'
 import { CoreAI_CombatantProfile } from '../AI/Profiles/CombatantProfile'
-import { BrainComponent } from '../AI/Components/BrainComponent'
+import { CorePlayer_BrainComponent } from '../Player/Components/AI/BrainComponent'
 
-export class CoreAI_Squad {
+export class Core_Squad {
     private members: CorePlayer_APlayer[] = []
     private leader: CorePlayer_APlayer | null = null
 
@@ -78,14 +78,14 @@ export class CoreAI_Squad {
             return
         }
 
-        const brainComp = ap.getComponent(BrainComponent)
+        const brainComp = ap.getComponent(CorePlayer_BrainComponent)
         if (!brainComp) {
             return
         }
 
         // Assign combatant profile configured to follow leader
         const profile = new CoreAI_CombatantProfile({
-            onfootMoveToSensor: {
+            roamSensor: {
                 getWPs: () => {
                     const p = this.getSquadPoint()
                     return p ? [p] : []

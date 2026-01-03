@@ -15,8 +15,8 @@ import { CoreAI_SensorContext } from '../SensorContext'
  *   to reduce AI clustering.
  *
  * Memory:
- * - Writes `moveToPos` intent with a TTL.
- * - Does not reselect while a valid `moveToPos` intent exists.
+ * - Writes `roamPos` intent with a TTL.
+ * - Does not reselect while a valid `roamPos` intent exists.
  *
  * Notes:
  * - No pathfinding or movement logic (sensor-only).
@@ -42,7 +42,7 @@ export class CoreAI_CapturePointMoveToSensor extends CoreAI_ASensor {
         if (!mod.IsPlayerValid(player)) return
 
         // Do not reselect while intent exists
-        if (ctx.memory.get('moveToPos')) return
+        if (ctx.memory.get('roamPos')) return
 
         const capturePoints = this.getCapturePoints()
         if (!capturePoints || capturePoints.length === 0) return
@@ -84,7 +84,7 @@ export class CoreAI_CapturePointMoveToSensor extends CoreAI_ASensor {
 
         // only one candidate
         if (!secondClosest) {
-            ctx.memory.set('moveToPos', closest.pos, this.ttlMs)
+            ctx.memory.set('roamPos', closest.pos, this.ttlMs)
             return
         }
 
@@ -93,7 +93,7 @@ export class CoreAI_CapturePointMoveToSensor extends CoreAI_ASensor {
         // ------------------------------------------------------------
 
         ctx.memory.set(
-            'moveToPos',
+            'roamPos',
             Math.random() < 1 ? closest.pos : secondClosest.pos,
             this.ttlMs
         )

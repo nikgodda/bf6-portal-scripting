@@ -18,7 +18,7 @@ export abstract class CoreAI_ABehavior {
     public abstract name: string
 
     // Throttling interval. Zero means no throttling.
-    protected intervalMs: number = 5000
+    protected intervalMs: number = 1000
 
     private lastUpdateTime: number = 0
 

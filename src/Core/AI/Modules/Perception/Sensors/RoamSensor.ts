@@ -2,7 +2,7 @@ import { CoreAI_ASensor } from '../ASensor'
 import { CoreAI_SensorContext } from '../SensorContext'
 
 /**
- * MoveToSensor:
+ * RoamSensor:
  * Picks a movement target from a list of points.
  *
  * Design:
@@ -11,7 +11,11 @@ import { CoreAI_SensorContext } from '../SensorContext'
  * - Velocity is preferred when speed > threshold.
  * - Intent direction stabilizes steering across replans.
  */
+<<<<<<<< HEAD:src/Core/AI/Modules/Perception/Sensors/MoveTo/OnfootMoveToSensor.ts
 export class CoreAI_OnfootMoveToSensor extends CoreAI_ASensor {
+========
+export class CoreAI_RoamSensor extends CoreAI_ASensor {
+>>>>>>>> playground:src/Core/AI/Modules/Perception/Sensors/RoamSensor.ts
     private readonly ttlMs: number
 
     private coldStart: boolean = true
@@ -22,7 +26,7 @@ export class CoreAI_OnfootMoveToSensor extends CoreAI_ASensor {
     constructor(
         private readonly getPoints: () => mod.Vector[],
         intervalMs: number = 750,
-        ttlMs: number = 6000
+        ttlMs: number = 2000
     ) {
         super(intervalMs)
         this.ttlMs = ttlMs
@@ -34,14 +38,16 @@ export class CoreAI_OnfootMoveToSensor extends CoreAI_ASensor {
     }
 
     protected update(ctx: CoreAI_SensorContext): void {
+        // Do not reselect while intent exists
+        if (ctx.memory.get('roamPos')) {
+            return
+        }
+
         const player = ctx.player
         if (!mod.IsPlayerValid(player)) return
         if (mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle)) {
             return
         }
-
-        // Do not reselect while intent exists
-        if (ctx.memory.get('moveToPos')) return
 
         const points = this.getPoints()
         if (!points || points.length === 0) return
@@ -144,7 +150,7 @@ export class CoreAI_OnfootMoveToSensor extends CoreAI_ASensor {
         // Commit
         // ------------------------------------------------------------
 
-        ctx.memory.set('moveToPos', best.pos, this.ttlMs)
+        ctx.memory.set('roamPos', best.pos, this.ttlMs)
         this.lastIntentDir = mod.DirectionTowards(myPos, best.pos)
         this.coldStart = false
     }

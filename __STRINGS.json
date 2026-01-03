@@ -4,15 +4,20 @@
       "debug": {
         "brain": {
           "behaviors": {
-            "fight": "fight",
             "defend": "defend",
+            "entervehicle": "entervehicle",
+            "fight": "fight",
             "idle": "idle",
             "moveto": "moveto"
           },
           "distance": "dis: {} | tea: {}",
           "memory": {
-            "battle": "fig: {} | def: {} | ene: {}",
-            "calm": "mov: {} | arr: {}"
+            "closestEnemy": "closestEnemy: {}",
+            "vehicleToDrive": "vehicleToDrive: {}",
+            "isInBattle": "isInBattle: {}",
+            "roamPos": "roamPos: {}",
+            "arrivedPos": "arrivedPos: {}",
+            "capturePoint": "capturePoint: {}"
           }
         }
       },

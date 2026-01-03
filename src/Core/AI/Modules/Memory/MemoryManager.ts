@@ -8,12 +8,11 @@
 
 export type CoreAI_MemoryFields = {
     closestEnemy: mod.Player | null
-
-    damagedBy: mod.Player | null
-    isFiring: boolean
-
-    moveToPos: mod.Vector | null // movement target
+    vehicleToDrive: mod.Vehicle | null
+    isInBattle: boolean
+    roamPos: mod.Vector | null // movement target
     arrivedPos: mod.Vector | null // semantic arrival
+    capturePoint: mod.CapturePoint | null
 }
 
 export class CoreAI_MemoryManager {
@@ -23,12 +22,11 @@ export class CoreAI_MemoryManager {
     /** All memory values live here */
     public data: CoreAI_MemoryFields = {
         closestEnemy: null,
-
-        damagedBy: null,
-        isFiring: false,
-
-        moveToPos: null,
+        vehicleToDrive: null,
+        isInBattle: false,
+        roamPos: null,
         arrivedPos: null,
+        capturePoint: null,
     }
 
     /** TTL expiration registry */
@@ -119,12 +117,11 @@ export class CoreAI_MemoryManager {
 
         this.data = {
             closestEnemy: null,
-
-            damagedBy: null,
-            isFiring: false,
-
-            moveToPos: null,
+            vehicleToDrive: null,
+            isInBattle: false,
+            roamPos: null,
             arrivedPos: null,
+            capturePoint: null,
         }
 
         this.expirations.clear()

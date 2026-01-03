@@ -1,5 +1,10 @@
 import { CoreUI_Colors } from 'src/Core/UI/UIColors'
 import { CoreAI_Brain } from '../../Brain'
+import { CoreAI_MemoryFields } from '../Memory/MemoryManager'
+
+// @stringkeys core.ai.debug.brain.memory: closestEnemy {}, vehicleToDrive {}, isInBattle {}, roamPos {}, arrivedPos {}
+
+// @stringkeys core.ai.debug.brain.behaviors: fight, defend, idle, moveto, entervehicle
 
 export interface CoreAI_IDebugWI {
     index: number
@@ -7,143 +12,205 @@ export interface CoreAI_IDebugWI {
 }
 
 export class CoreAI_DebugWI {
-    private behavior: CoreAI_IDebugWI
+    /* private behavior: CoreAI_IDebugWI
     private stats: CoreAI_IDebugWI
     private battle: CoreAI_IDebugWI
-    private calm: CoreAI_IDebugWI
+    private calm: CoreAI_IDebugWI */
 
-    private moveTo: mod.WorldIcon
+    private receiver: mod.Player
+    private brain: CoreAI_Brain
 
-    constructor(private player: mod.Player, private brain: CoreAI_Brain) {
-        this.calm = { index: 3, worldIcon: this.spawnWI(player) }
-        this.battle = { index: 2, worldIcon: this.spawnWI(player) }
-        this.stats = { index: 1, worldIcon: this.spawnWI(player) }
-        this.behavior = { index: 0, worldIcon: this.spawnWI(player) }
+    private behaviorWI: mod.WorldIcon
+    private behaviorColorsMap: Map<string, mod.Vector> = new Map([
+        ['fight', mod.CreateVector(1, 0, 0)],
+        ['defend', mod.CreateVector(1, 1, 0)],
+        ['idle', mod.CreateVector(1, 1, 1)],
+        ['moveto', mod.CreateVector(0, 1, 1)],
+        ['entervehicle', mod.CreateVector(0, 1, 0)],
+    ])
 
-        this.moveTo = mod.SpawnObject(
+    private roamPosWI: mod.WorldIcon
+    private vehicleToDriveWI: mod.WorldIcon
+
+    private memoryWIs: Map<keyof CoreAI_MemoryFields, mod.WorldIcon> = new Map()
+
+    constructor(receiver: mod.Player, brain: CoreAI_Brain) {
+        this.receiver = receiver
+        this.brain = brain
+
+        this.behaviorWI = mod.SpawnObject(
             mod.RuntimeSpawn_Common.WorldIcon,
-            mod.GetObjectPosition(mod.GetHQ(2)),
+            mod.CreateVector(0, 0, 0),
             mod.CreateVector(0, 0, 0)
         )
-        mod.SetWorldIconOwner(this.moveTo, player)
-        mod.SetWorldIconImage(this.moveTo, mod.WorldIconImages.Skull)
-        mod.EnableWorldIconImage(this.moveTo, true)
-        mod.SetWorldIconColor(this.moveTo, CoreUI_Colors.YellowDark)
+        mod.SetWorldIconOwner(this.behaviorWI, receiver)
+
+        let i = 1
+        for (const key of Object.keys(this.brain.memory.data) as Array<
+            keyof typeof this.brain.memory.data
+        >) {
+            const wi = mod.SpawnObject(
+                mod.RuntimeSpawn_Common.WorldIcon,
+                mod.CreateVector(0, 0, 0),
+                mod.CreateVector(0, 0, 0)
+            )
+            mod.SetWorldIconOwner(wi, receiver)
+
+            this.memoryWIs.set(key, wi)
+            i++
+        }
+
+        this.roamPosWI = mod.SpawnObject(
+            mod.RuntimeSpawn_Common.WorldIcon,
+            mod.CreateVector(0, 0, 0),
+            mod.CreateVector(0, 0, 0)
+        )
+        mod.SetWorldIconOwner(this.roamPosWI, receiver)
+        mod.SetWorldIconImage(this.roamPosWI, mod.WorldIconImages.Flag)
+        mod.EnableWorldIconImage(this.roamPosWI, true)
+        mod.SetWorldIconColor(this.roamPosWI, mod.CreateVector(0, 1, 1))
+
+        this.vehicleToDriveWI = mod.SpawnObject(
+            mod.RuntimeSpawn_Common.WorldIcon,
+            mod.CreateVector(0, 0, 0),
+            mod.CreateVector(0, 0, 0)
+        )
+        mod.SetWorldIconOwner(this.vehicleToDriveWI, receiver)
+        mod.SetWorldIconImage(this.vehicleToDriveWI, mod.WorldIconImages.Assist)
+        mod.EnableWorldIconImage(this.vehicleToDriveWI, true)
+        mod.SetWorldIconColor(this.vehicleToDriveWI, mod.CreateVector(1, 1, 0))
     }
 
     update() {
-        if (this.brain.memory.get('moveToPos')) {
-            mod.SetWorldIconPosition(
-                this.moveTo,
-                this.brain.memory.get('moveToPos')!
-            )
-            mod.EnableWorldIconImage(this.moveTo, true)
-        } else {
-            mod.EnableWorldIconImage(this.moveTo, false)
-        }
-
-        if (
-            !mod.IsPlayerValid(this.brain.player) ||
-            !mod.GetSoldierState(
-                this.brain.player,
-                mod.SoldierStateBool.IsAlive
-            )
-        ) {
-            mod.EnableWorldIconText(this.behavior.worldIcon, false)
-            mod.EnableWorldIconText(this.stats.worldIcon, false)
-            mod.EnableWorldIconText(this.battle.worldIcon, false)
-            mod.EnableWorldIconText(this.calm.worldIcon, false)
-            return
-        }
-
-        mod.EnableWorldIconText(this.behavior.worldIcon, true)
-        mod.EnableWorldIconText(this.stats.worldIcon, true)
-        mod.EnableWorldIconText(this.battle.worldIcon, true)
-        mod.EnableWorldIconText(this.calm.worldIcon, true)
-
-        // @stringkeys core.ai.debug.brain.behaviors: fight, defend, idle, moveto
+        const isValid =
+            mod.IsPlayerValid(this.brain.player) &&
+            mod.GetSoldierState(this.brain.player, mod.SoldierStateBool.IsAlive)
 
         /**
          * Behavior
          */
-        this.updateWI(
-            this.behavior,
-            mod.Message(
-                `core.ai.debug.brain.behaviors.${
-                    this.brain.behaviorController.currentBehavior().name
-                }`
+        if (isValid) {
+            mod.EnableWorldIconText(this.behaviorWI, true)
+            mod.SetWorldIconPosition(
+                this.behaviorWI,
+                mod.CreateVector(
+                    mod.XComponentOf(mod.GetObjectPosition(this.brain.player)),
+                    mod.YComponentOf(mod.GetObjectPosition(this.brain.player)) +
+                        this.getStackedIconOffset(
+                            mod.DistanceBetween(
+                                mod.GetObjectPosition(this.brain.player),
+                                mod.GetObjectPosition(this.receiver)
+                            ),
+                            0,
+                            0.6
+                        ),
+                    mod.ZComponentOf(mod.GetObjectPosition(this.brain.player))
+                )
             )
-        )
-
-        // Behavior Colors
-        switch (this.brain.behaviorController.currentBehavior().name) {
-            case 'fight':
-                mod.SetWorldIconColor(
-                    this.behavior.worldIcon,
-                    mod.CreateVector(1, 0, 0)
+            mod.SetWorldIconText(
+                this.behaviorWI,
+                mod.Message(
+                    `core.ai.debug.brain.behaviors.${
+                        this.brain.behaviorController.currentBehavior().name
+                    }`
                 )
-                break
-            case 'defend':
-                mod.SetWorldIconColor(
-                    this.behavior.worldIcon,
-                    mod.CreateVector(0, 1, 1)
-                )
-                break
-            case 'moveto':
-                mod.SetWorldIconColor(
-                    this.behavior.worldIcon,
-                    mod.CreateVector(0, 1, 0)
-                )
-                break
-            case 'idle':
-                mod.SetWorldIconColor(
-                    this.behavior.worldIcon,
-                    mod.CreateVector(1, 1, 1)
-                )
-                break
+            )
+            mod.SetWorldIconColor(
+                this.behaviorWI,
+                this.behaviorColorsMap.get(
+                    this.brain.behaviorController.currentBehavior().name
+                )!
+            )
+        } else {
+            mod.EnableWorldIconText(this.behaviorWI, false)
         }
 
         /**
-         * Stats (distance + team)
+         * Memory
          */
-        this.updateWI(
-            this.stats,
-            mod.Message(
-                `core.ai.debug.brain.distance`,
-                Math.floor(
-                    mod.DistanceBetween(
-                        mod.GetObjectPosition(this.brain.player),
-                        mod.GetObjectPosition(this.player)
-                    )
-                ),
-                mod.GetObjId(mod.GetTeam(this.brain.player))
+        let i = 1
+        for (const [key, wi] of this.memoryWIs) {
+            if (!isValid) {
+                mod.EnableWorldIconText(wi, false)
+                continue
+            }
+
+            mod.SetWorldIconColor(
+                wi,
+                this.brain.memory.getTimeRemaining(key) === 0
+                    ? mod.CreateVector(1, 1, 1)
+                    : mod.CreateVector(1, 1, 0)
             )
-        )
+            mod.EnableWorldIconText(wi, true)
+            mod.SetWorldIconPosition(
+                wi,
+                mod.CreateVector(
+                    mod.XComponentOf(mod.GetObjectPosition(this.brain.player)),
+                    mod.YComponentOf(mod.GetObjectPosition(this.brain.player)) +
+                        this.getStackedIconOffset(
+                            mod.DistanceBetween(
+                                mod.GetObjectPosition(this.brain.player),
+                                mod.GetObjectPosition(this.receiver)
+                            ),
+                            i,
+                            0.6
+                        ),
+                    mod.ZComponentOf(mod.GetObjectPosition(this.brain.player))
+                )
+            )
+            mod.SetWorldIconText(
+                wi,
+                mod.Message(
+                    `core.ai.debug.brain.memory.${key}`,
+                    this.brain.memory.getTimeRemaining(key)
+                )
+            )
+
+            i++
+        }
 
         /**
-         * Battle Memory fields
+         * Roam navigation
          */
-        this.updateWI(
-            this.battle,
-            mod.Message(
-                `core.ai.debug.brain.memory.battle`,
-                this.brain.memory.getTimeRemaining('isFiring'),
-                this.brain.memory.getTimeRemaining('damagedBy'),
-                this.brain.memory.getTimeRemaining('closestEnemy')
+        if (this.brain.memory.get('roamPos')) {
+            mod.SetWorldIconPosition(
+                this.roamPosWI,
+                this.brain.memory.get('roamPos')!
             )
-        )
+            mod.EnableWorldIconImage(this.roamPosWI, true)
+            mod.SetWorldIconText(
+                this.roamPosWI,
+                mod.Message(this.brain.memory.getTimeRemaining('roamPos'))
+            )
+            mod.EnableWorldIconText(this.roamPosWI, true)
+        } else {
+            mod.EnableWorldIconImage(this.roamPosWI, false)
+            mod.EnableWorldIconText(this.roamPosWI, false)
+        }
 
         /**
-         * Calm Memory fields
+         * Vehicle to Drive navigation
          */
-        this.updateWI(
-            this.calm,
-            mod.Message(
-                `core.ai.debug.brain.memory.calm`,
-                this.brain.memory.getTimeRemaining('moveToPos'),
-                this.brain.memory.getTimeRemaining('arrivedPos')
+        if (this.brain.memory.get('vehicleToDrive')) {
+            mod.SetWorldIconPosition(
+                this.vehicleToDriveWI,
+                mod.GetVehicleState(
+                    this.brain.memory.get('vehicleToDrive')!,
+                    mod.VehicleStateVector.VehiclePosition
+                )
             )
-        )
+            mod.EnableWorldIconImage(this.vehicleToDriveWI, true)
+            mod.SetWorldIconText(
+                this.vehicleToDriveWI,
+                mod.Message(
+                    this.brain.memory.getTimeRemaining('vehicleToDrive')
+                )
+            )
+            mod.EnableWorldIconText(this.vehicleToDriveWI, true)
+        } else {
+            mod.EnableWorldIconImage(this.vehicleToDriveWI, false)
+            mod.EnableWorldIconText(this.vehicleToDriveWI, false)
+        }
     }
 
     private round2decimal(num: number): number {
@@ -199,39 +266,5 @@ export class CoreAI_DebugWI {
 
         // Each stacked icon sits on top of the previous one
         return baseOffset + index * gap * scale
-    }
-
-    private spawnWI(receiver: mod.Player): mod.WorldIcon {
-        const wi = mod.SpawnObject(
-            mod.RuntimeSpawn_Common.WorldIcon,
-            mod.CreateVector(0, 0, 0),
-            mod.CreateVector(0, 0, 0)
-        )
-        mod.SetWorldIconOwner(wi, receiver)
-        mod.SetWorldIconColor(wi, mod.CreateVector(1, 1, 1))
-        mod.SetWorldIconText(wi, mod.Message(''))
-        mod.EnableWorldIconText(wi, true)
-
-        return wi
-    }
-
-    private updateWI(wi: CoreAI_IDebugWI, mes: mod.Message): void {
-        mod.SetWorldIconPosition(
-            wi.worldIcon,
-            mod.CreateVector(
-                mod.XComponentOf(mod.GetObjectPosition(this.brain.player)),
-                mod.YComponentOf(mod.GetObjectPosition(this.brain.player)) +
-                    this.getStackedIconOffset(
-                        mod.DistanceBetween(
-                            mod.GetObjectPosition(this.brain.player),
-                            mod.GetObjectPosition(this.player)
-                        ),
-                        wi.index,
-                        0.6
-                    ),
-                mod.ZComponentOf(mod.GetObjectPosition(this.brain.player))
-            )
-        )
-        mod.SetWorldIconText(wi.worldIcon, mes)
     }
 }
