@@ -3363,7 +3363,6 @@ export class CoreAI_EnterVehicleBehavior extends CoreAI_ABehavior {
             return
         }
 
-        console.log(4)
         const occupant = mod.GetPlayerFromVehicleSeat(
             this.vehicle,
             this.seatIndex
@@ -4124,7 +4123,7 @@ export class CoreAI_CombatantProfile extends CoreAI_BaseProfile {
     }
 }
 
-// -------- FILE: src\Core\AI\Components\BrainComponent.ts --------
+// -------- FILE: src\Core\Player\Components\AI\BrainComponent.ts --------
 // src/Core/AI/Components/BrainComponent.ts
 /**
  * BrainComponent
@@ -4132,7 +4131,7 @@ export class CoreAI_CombatantProfile extends CoreAI_BaseProfile {
  * AI behavior component attached to a logical player.
  * Created and configured by GameMode.
  */
-export class CoreAI_BrainComponent implements CorePlayer_IComponent {
+export class CorePlayer_BrainComponent implements CorePlayer_IComponent {
     public readonly brain: CoreAI_Brain
 
     private ap!: CorePlayer_APlayer
@@ -4185,7 +4184,7 @@ export class CoreAI_BrainComponent implements CorePlayer_IComponent {
 }
 
 // -------- FILE: src\Core\Squad\Squad.ts --------
-export class CoreAI_Squad {
+export class Core_Squad {
     private members: CorePlayer_APlayer[] = []
     private leader: CorePlayer_APlayer | null = null
 
@@ -4260,7 +4259,7 @@ export class CoreAI_Squad {
             return
         }
 
-        const brainComp = ap.getComponent(CoreAI_BrainComponent)
+        const brainComp = ap.getComponent(CorePlayer_BrainComponent)
         if (!brainComp) {
             return
         }
@@ -4309,7 +4308,7 @@ export class CoreAI_Squad {
 // -------- FILE: src\Core\Squad\SquadManager.ts --------
 export class Core_SquadManager {
     private gameMode: Core_AGameMode
-    private squads: CoreAI_Squad[] = []
+    private squads: Core_Squad[] = []
     private maxSlots: number
 
     constructor(gameMode: Core_AGameMode, maxSlots: number = 4) {
@@ -4320,7 +4319,7 @@ export class Core_SquadManager {
     /* ------------------------------------------------------------
      * Player Join
      * ------------------------------------------------------------ */
-    async addToSquad(ap: CorePlayer_APlayer): Promise<CoreAI_Squad> {
+    async addToSquad(ap: CorePlayer_APlayer): Promise<Core_Squad> {
         const teamId = mod.GetObjId(mod.GetTeam(ap.player))
 
         // Find squad with same team + free slots
@@ -4330,7 +4329,7 @@ export class Core_SquadManager {
 
         // Create new squad if no free one exists
         if (!squad) {
-            squad = new CoreAI_Squad(this.gameMode, teamId, this.maxSlots)
+            squad = new Core_Squad(this.gameMode, teamId, this.maxSlots)
             this.squads.push(squad)
         }
 
@@ -4353,15 +4352,15 @@ export class Core_SquadManager {
     /* ------------------------------------------------------------
      * Helpers
      * ------------------------------------------------------------ */
-    getSquad(ap: CorePlayer_APlayer): CoreAI_Squad | undefined {
+    getSquad(ap: CorePlayer_APlayer): Core_Squad | undefined {
         return this.squads.find((s) => s.getMembers().includes(ap))
     }
 
-    getSquadsByTeam(teamId: number): CoreAI_Squad[] {
+    getSquadsByTeam(teamId: number): Core_Squad[] {
         return this.squads.filter((s) => s.getTeamId() === teamId)
     }
 
-    getAllSquads(): CoreAI_Squad[] {
+    getAllSquads(): Core_Squad[] {
         return this.squads
     }
 }
@@ -4433,7 +4432,7 @@ export class Player extends CorePlayer_APlayer {
                     ? this.protectionComp.activate(5)
                     : this.protectionComp.activate(5)
 
-                const brainComp = this.getComponent(CoreAI_BrainComponent)
+                const brainComp = this.getComponent(CorePlayer_BrainComponent)
                 if (brainComp) {
                     brainComp.brain.installProfile(PG_GameMode.infantryProfile)
                 }
@@ -4443,7 +4442,7 @@ export class Player extends CorePlayer_APlayer {
             },
 
             OnPlayerEnterVehicleSeat: (eventVehicle, eventSeat) => {
-                const brainComp = this.getComponent(CoreAI_BrainComponent)
+                const brainComp = this.getComponent(CorePlayer_BrainComponent)
                 if (brainComp) {
                     if (mod.GetPlayerVehicleSeat(this.player) !== 0) {
                         return
@@ -4454,7 +4453,7 @@ export class Player extends CorePlayer_APlayer {
             },
 
             OnPlayerExitVehicle: (eventVehicle) => {
-                const brainComp = this.getComponent(CoreAI_BrainComponent)
+                const brainComp = this.getComponent(CorePlayer_BrainComponent)
                 if (brainComp) {
                     brainComp.brain.installProfile(PG_GameMode.infantryProfile)
                 }
@@ -4638,7 +4637,7 @@ export class PG_GameMode extends Core_AGameMode {
                 true
             )
 
-            lp.addComponent(new CoreAI_BrainComponent(brain))
+            lp.addComponent(new CorePlayer_BrainComponent(brain))
         }
 
         // Ensure squad system exists and register the player

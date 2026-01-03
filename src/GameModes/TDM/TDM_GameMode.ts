@@ -4,7 +4,7 @@ import { TDM_PlayerManager } from './Player/TDM_PlayerManager'
 import { CorePlayer_APlayer } from 'src/Core/Player/APlayer'
 import { CoreAI_Brain } from 'src/Core/AI/Brain'
 import { CoreAI_CombatantProfile } from 'src/Core/AI/Profiles/CombatantProfile'
-import { CoreAI_BrainComponent } from 'src/Core/AI/Components/BrainComponent'
+import { CorePlayer_BrainComponent } from 'src/Core/Player/Components/AI/BrainComponent'
 import { Core_SquadManager } from 'src/Core/Squad/SquadManager'
 
 export class TDM_GameMode extends Core_AGameMode {
@@ -79,7 +79,7 @@ export class TDM_GameMode extends Core_AGameMode {
                 false
             )
 
-            lp.addComponent(new CoreAI_BrainComponent(brain))
+            lp.addComponent(new CorePlayer_BrainComponent(brain))
         }
 
         // Ensure squad system exists and register the player

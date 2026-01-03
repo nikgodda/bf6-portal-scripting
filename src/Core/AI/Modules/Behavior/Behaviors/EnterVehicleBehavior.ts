@@ -65,7 +65,6 @@ export class CoreAI_EnterVehicleBehavior extends CoreAI_ABehavior {
             return
         }
 
-        console.log(4)
         const occupant = mod.GetPlayerFromVehicleSeat(
             this.vehicle,
             this.seatIndex

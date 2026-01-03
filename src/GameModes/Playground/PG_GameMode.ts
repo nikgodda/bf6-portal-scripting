@@ -3,7 +3,7 @@ import { CorePlayer_APlayerManager } from 'src/Core/Player/APlayerManager'
 import { CorePlayer_APlayer } from 'src/Core/Player/APlayer'
 import { CoreAI_Brain } from 'src/Core/AI/Brain'
 import { CoreAI_CombatantProfile } from 'src/Core/AI/Profiles/CombatantProfile'
-import { CoreAI_BrainComponent } from 'src/Core/AI/Components/BrainComponent'
+import { CorePlayer_BrainComponent } from 'src/Core/Player/Components/AI/BrainComponent'
 import { Core_SquadManager } from 'src/Core/Squad/SquadManager'
 import { PlayerManager } from './Player/PlayerManager'
 import { CoreAI_BaseProfile } from 'src/Core/AI/Profiles/BaseProfile'
@@ -113,7 +113,7 @@ export class PG_GameMode extends Core_AGameMode {
                 true
             )
 
-            lp.addComponent(new CoreAI_BrainComponent(brain))
+            lp.addComponent(new CorePlayer_BrainComponent(brain))
         }
 
         // Ensure squad system exists and register the player

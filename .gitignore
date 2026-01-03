@@ -23,4 +23,5 @@ Thumbs.db
 # Logs
 *.log
 
-dump-ai.js
+scripts/
+__AISCRIPT.ts
