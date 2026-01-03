@@ -1,9 +1,7 @@
 import { CorePlayer_IGameModeEngineEvents } from 'src/Core/IGameModeEngineEvents'
 import { PG_GameMode } from '../PG_GameMode'
 
-export class CapturePointTimeService
-    implements CorePlayer_IGameModeEngineEvents
-{
+export class CapturePointTimeService {
     private readonly captureProgressMap = new Map<
         number,
         {
@@ -28,19 +26,19 @@ export class CapturePointTimeService
 
         const capturePointId = mod.GetObjId(eventCapturePoint)
 
-        const captureProgressMapEntry =
-            this.captureProgressMap.get(capturePointId)
+        let entry = this.captureProgressMap.get(capturePointId)
 
-        if (!captureProgressMapEntry) {
-            this.captureProgressMap.set(capturePointId, {
+        if (!entry) {
+            entry = {
                 captureProgress,
                 isCapturing: null,
-            })
+            }
+            this.captureProgressMap.set(capturePointId, entry)
         }
 
-        if (captureProgress < captureProgressMapEntry!.captureProgress) {
+        if (captureProgress < entry.captureProgress) {
             // Neutralization
-            if (captureProgressMapEntry?.isCapturing !== false) {
+            if (entry.isCapturing !== false) {
                 mod.SetCapturePointNeutralizationTime(
                     eventCapturePoint,
                     this.time
@@ -53,7 +51,7 @@ export class CapturePointTimeService
             })
         } else {
             // Capturing
-            if (captureProgressMapEntry?.isCapturing !== true) {
+            if (entry.isCapturing !== true) {
                 mod.SetCapturePointCapturingTime(eventCapturePoint, this.time)
             }
 

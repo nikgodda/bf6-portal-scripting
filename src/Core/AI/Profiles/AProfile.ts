@@ -75,5 +75,6 @@ export interface CoreAI_SensorOptions {
     arrivalSensor?: CoreAI_ArrivalSensorOptions
     roamSensor?: CoreAI_MoveToSensorOptions
     onDriveMoveToSensor?: CoreAI_MoveToSensorOptions
+    capturePointSensor?: CoreAI_CapturePointSensorOptions
     moveToCapturePointSensor?: CoreAI_CapturePointSensorOptions
 }

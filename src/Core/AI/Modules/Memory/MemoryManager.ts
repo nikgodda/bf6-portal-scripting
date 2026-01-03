@@ -12,6 +12,7 @@ export type CoreAI_MemoryFields = {
     isInBattle: boolean
     roamPos: mod.Vector | null // movement target
     arrivedPos: mod.Vector | null // semantic arrival
+    capturePoint: mod.CapturePoint | null
 }
 
 export class CoreAI_MemoryManager {
@@ -25,6 +26,7 @@ export class CoreAI_MemoryManager {
         isInBattle: false,
         roamPos: null,
         arrivedPos: null,
+        capturePoint: null,
     }
 
     /** TTL expiration registry */
@@ -119,6 +121,7 @@ export class CoreAI_MemoryManager {
             isInBattle: false,
             roamPos: null,
             arrivedPos: null,
+            capturePoint: null,
         }
 
         this.expirations.clear()

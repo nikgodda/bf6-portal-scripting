@@ -11,6 +11,7 @@ import { CoreAI_ClosestEnemySensor } from '../Modules/Perception/Sensors/Closest
 import { CoreAI_VehicleToDriveSensor } from '../Modules/Perception/Sensors/VehicleToDriveSensor'
 import { CoreAI_ArrivalSensor } from '../Modules/Perception/Sensors/ArrivalSensor'
 import { CoreAI_RoamSensor } from '../Modules/Perception/Sensors/RoamSensor'
+import { CoreAI_CapturePointSensor } from '../Modules/Perception/Sensors/CapturePointSensor'
 import { CoreAI_CapturePointMoveToSensor } from '../Modules/Perception/Sensors/CapturePointMoveToSensor'
 
 export type CoreAI_BaseProfileOptions = CoreAI_SensorOptions
@@ -61,12 +62,12 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                         vPos
                     )
 
-                    if (dist <= 3.0) {
+                    if (dist <= 5.0) {
                         return new CoreAI_EnterVehicleBehavior(
                             brain,
                             vehicle,
                             0,
-                            3.0
+                            5.0
                         )
                     }
 
@@ -178,6 +179,15 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                     options.arrivalSensor?.distanceThreshold,
                     options.arrivalSensor?.ttlMs,
                     options.arrivalSensor?.cooldownMs
+                )
+        )
+
+        this.addSensorIf(
+            options.capturePointSensor,
+            () =>
+                new CoreAI_CapturePointSensor(
+                    options.capturePointSensor?.intervalMs,
+                    options.capturePointSensor?.ttlMs
                 )
         )
 

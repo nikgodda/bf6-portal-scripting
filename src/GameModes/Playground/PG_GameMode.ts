@@ -33,6 +33,7 @@ export class PG_GameMode extends Core_AGameMode {
             vehicleToDriveSensor: {
                 radius: 100,
             },
+            capturePointSensor: {},
         })
 
     public static driverProfile: CoreAI_BaseProfile =
@@ -44,6 +45,7 @@ export class PG_GameMode extends Core_AGameMode {
                 getWPs: () => PG_GameMode.getRangeWPs(1106, 1107),
                 ttlMs: 60_000,
             },
+            capturePointSensor: {},
             /* arrivalSensor: {
                 getWPs: () => this.getRangeWPs(1106, 1107),
                 ttlMs: 20_000,
@@ -55,8 +57,15 @@ export class PG_GameMode extends Core_AGameMode {
         // One-time game setup (rules, scoreboard, AI bootstrap)
         // mod.SetAIToHumanDamageModifier(2)
         mod.SetFriendlyFire(true)
-
         new CapturePointTimeService(this, 5)
+
+        // mod.EnableGameModeObjective(mod.GetCapturePoint(2), false)
+
+        mod.SetCapturePointOwner(mod.GetCapturePoint(1), mod.GetTeam(2))
+        mod.SetCapturePointOwner(mod.GetCapturePoint(2), mod.GetTeam(128))
+        console.log(
+            mod.GetObjId(mod.GetCurrentOwnerTeam(mod.GetCapturePoint(2)))
+        )
 
         // Spawn initial logical bots
         for (let i = 1; i <= this.AI_COUNT_TEAM_1; i++) {

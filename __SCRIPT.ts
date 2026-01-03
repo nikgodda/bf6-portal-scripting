@@ -1738,6 +1738,7 @@ export type CoreAI_MemoryFields = {
     isInBattle: boolean
     roamPos: mod.Vector | null // movement target
     arrivedPos: mod.Vector | null // semantic arrival
+    capturePoint: mod.CapturePoint | null
 }
 
 export class CoreAI_MemoryManager {
@@ -1751,6 +1752,7 @@ export class CoreAI_MemoryManager {
         isInBattle: false,
         roamPos: null,
         arrivedPos: null,
+        capturePoint: null,
     }
 
     /** TTL expiration registry */
@@ -1845,6 +1847,7 @@ export class CoreAI_MemoryManager {
             isInBattle: false,
             roamPos: null,
             arrivedPos: null,
+            capturePoint: null,
         }
 
         this.expirations.clear()
@@ -2247,6 +2250,7 @@ export interface CoreAI_SensorOptions {
     arrivalSensor?: CoreAI_ArrivalSensorOptions
     roamSensor?: CoreAI_MoveToSensorOptions
     onDriveMoveToSensor?: CoreAI_MoveToSensorOptions
+    capturePointSensor?: CoreAI_CapturePointSensorOptions
     moveToCapturePointSensor?: CoreAI_CapturePointSensorOptions
 }
 
@@ -3739,6 +3743,74 @@ export class CoreAI_RoamSensor extends CoreAI_ASensor {
     }
 }
 
+// -------- FILE: src\Core\AI\Modules\Perception\Sensors\CapturePointSensor.ts --------
+/**
+ * VehicleToDriveSensor:
+ * Finds the closest vehicle with a free driver seat within radius.
+ *
+ * Writes:
+ * - memory.vehicleToDrive
+ */
+export class CoreAI_CapturePointSensor extends CoreAI_ASensor {
+    constructor(
+        // private readonly radius: number = 30,
+        intervalMs: number = 1000,
+        private readonly ttlMs: number = 3000
+    ) {
+        super(intervalMs)
+    }
+
+    protected update(ctx: CoreAI_SensorContext): void {
+        const player = ctx.player
+        if (!mod.IsPlayerValid(player)) return
+
+        const capturePoints = mod.AllCapturePoints()
+        const count = mod.CountOf(capturePoints)
+
+        let closest: mod.CapturePoint | null = null
+        let closestDist = Infinity
+
+        for (let i = 0; i < count; i++) {
+            const cp = mod.ValueInArray(capturePoints, i) as mod.CapturePoint
+
+            // console.log(mod.GetObjId(cp))
+            // console.log(mod.GetCapturePoint(mod.GetObjId(cp)))
+
+            /* const pos = mod.GetObjectPosition(cp)
+            console.log(
+                mod.XComponentOf(pos),
+                ' ',
+                mod.YComponentOf(pos),
+                ' ',
+                mod.ZComponentOf(pos),
+                ' '
+            ) */
+
+            /* if (mod.IsVehicleSeatOccupied(v, 0)) {
+                continue
+            }
+
+            const vPos = mod.GetVehicleState(
+                v,
+                mod.VehicleStateVector.VehiclePosition
+            )
+            const dist = mod.DistanceBetween(myPos, vPos)
+            if (dist > this.radius) continue
+
+            if (dist < closestDist) {
+                closestDist = dist
+                closest = v
+            } */
+        }
+
+        if (closest) {
+            ctx.memory.set('capturePoint', closest, this.ttlMs)
+        } else {
+            ctx.memory.set('capturePoint', null)
+        }
+    }
+}
+
 // -------- FILE: src\Core\AI\Modules\Perception\Sensors\CapturePointMoveToSensor.ts --------
 /**
  * MoveToCapturePointSensor
@@ -3888,12 +3960,12 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                         vPos
                     )
 
-                    if (dist <= 3.0) {
+                    if (dist <= 5.0) {
                         return new CoreAI_EnterVehicleBehavior(
                             brain,
                             vehicle,
                             0,
-                            3.0
+                            5.0
                         )
                     }
 
@@ -4005,6 +4077,15 @@ export class CoreAI_BaseProfile extends CoreAI_AProfile {
                     options.arrivalSensor?.distanceThreshold,
                     options.arrivalSensor?.ttlMs,
                     options.arrivalSensor?.cooldownMs
+                )
+        )
+
+        this.addSensorIf(
+            options.capturePointSensor,
+            () =>
+                new CoreAI_CapturePointSensor(
+                    options.capturePointSensor?.intervalMs,
+                    options.capturePointSensor?.ttlMs
                 )
         )
 
@@ -4390,9 +4471,7 @@ export class PlayerManager extends CorePlayer_APlayerManager {
 }
 
 // -------- FILE: src\GameModes\Playground\Services\CapturePointTimeService.ts --------
-export class CapturePointTimeService
-    implements CorePlayer_IGameModeEngineEvents
-{
+export class CapturePointTimeService {
     private readonly captureProgressMap = new Map<
         number,
         {
@@ -4417,19 +4496,19 @@ export class CapturePointTimeService
 
         const capturePointId = mod.GetObjId(eventCapturePoint)
 
-        const captureProgressMapEntry =
-            this.captureProgressMap.get(capturePointId)
+        let entry = this.captureProgressMap.get(capturePointId)
 
-        if (!captureProgressMapEntry) {
-            this.captureProgressMap.set(capturePointId, {
+        if (!entry) {
+            entry = {
                 captureProgress,
                 isCapturing: null,
-            })
+            }
+            this.captureProgressMap.set(capturePointId, entry)
         }
 
-        if (captureProgress < captureProgressMapEntry!.captureProgress) {
+        if (captureProgress < entry.captureProgress) {
             // Neutralization
-            if (captureProgressMapEntry?.isCapturing !== false) {
+            if (entry.isCapturing !== false) {
                 mod.SetCapturePointNeutralizationTime(
                     eventCapturePoint,
                     this.time
@@ -4442,7 +4521,7 @@ export class CapturePointTimeService
             })
         } else {
             // Capturing
-            if (captureProgressMapEntry?.isCapturing !== true) {
+            if (entry.isCapturing !== true) {
                 mod.SetCapturePointCapturingTime(eventCapturePoint, this.time)
             }
 
@@ -4479,6 +4558,7 @@ export class PG_GameMode extends Core_AGameMode {
             vehicleToDriveSensor: {
                 radius: 100,
             },
+            capturePointSensor: {},
         })
 
     public static driverProfile: CoreAI_BaseProfile =
@@ -4490,6 +4570,7 @@ export class PG_GameMode extends Core_AGameMode {
                 getWPs: () => PG_GameMode.getRangeWPs(1106, 1107),
                 ttlMs: 60_000,
             },
+            capturePointSensor: {},
             /* arrivalSensor: {
                 getWPs: () => this.getRangeWPs(1106, 1107),
                 ttlMs: 20_000,
@@ -4501,8 +4582,15 @@ export class PG_GameMode extends Core_AGameMode {
         // One-time game setup (rules, scoreboard, AI bootstrap)
         // mod.SetAIToHumanDamageModifier(2)
         mod.SetFriendlyFire(true)
-
         new CapturePointTimeService(this, 5)
+
+        // mod.EnableGameModeObjective(mod.GetCapturePoint(2), false)
+
+        mod.SetCapturePointOwner(mod.GetCapturePoint(1), mod.GetTeam(2))
+        mod.SetCapturePointOwner(mod.GetCapturePoint(2), mod.GetTeam(128))
+        console.log(
+            mod.GetObjId(mod.GetCurrentOwnerTeam(mod.GetCapturePoint(2)))
+        )
 
         // Spawn initial logical bots
         for (let i = 1; i <= this.AI_COUNT_TEAM_1; i++) {
