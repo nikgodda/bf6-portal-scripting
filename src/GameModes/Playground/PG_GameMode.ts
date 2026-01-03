@@ -7,6 +7,7 @@ import { CoreAI_BrainComponent } from 'src/Core/AI/Components/BrainComponent'
 import { Core_SquadManager } from 'src/Core/Squad/SquadManager'
 import { PlayerManager } from './Player/PlayerManager'
 import { CoreAI_BaseProfile } from 'src/Core/AI/Profiles/BaseProfile'
+import { CapturePointTimeService } from './Services/CapturePointTimeService'
 
 export class PG_GameMode extends Core_AGameMode {
     protected override createPlayerManager(): CorePlayer_APlayerManager {
@@ -15,7 +16,7 @@ export class PG_GameMode extends Core_AGameMode {
 
     private AI_UNSPAWN_DELAY = 10
     private AI_COUNT_TEAM_1 = 1
-    private AI_COUNT_TEAM_2 = 2
+    private AI_COUNT_TEAM_2 = 0
 
     private squadManager: Core_SquadManager | null = null
 
@@ -55,6 +56,8 @@ export class PG_GameMode extends Core_AGameMode {
         // mod.SetAIToHumanDamageModifier(2)
         mod.SetFriendlyFire(true)
 
+        new CapturePointTimeService(this, 5)
+
         // Spawn initial logical bots
         for (let i = 1; i <= this.AI_COUNT_TEAM_1; i++) {
             mod.Wait(1).then(() =>
@@ -85,14 +88,6 @@ export class PG_GameMode extends Core_AGameMode {
      *
      */
 
-    protected override OnVehicleSpawned(eventVehicle: mod.Vehicle): void {
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(666))
-    }
-
-    /*
-     *
-     */
-
     protected override async OnLogicalPlayerJoinGame(
         lp: CorePlayer_APlayer
     ): Promise<void> {
@@ -106,7 +101,7 @@ export class PG_GameMode extends Core_AGameMode {
             const brain = new CoreAI_Brain(
                 lp.player,
                 PG_GameMode.infantryProfile,
-                false
+                true
             )
 
             lp.addComponent(new CoreAI_BrainComponent(brain))

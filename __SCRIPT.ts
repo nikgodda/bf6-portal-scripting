@@ -2484,7 +2484,6 @@ export class CoreAI_DebugWI {
             mod.CreateVector(0, 0, 0),
             mod.CreateVector(0, 0, 0)
         )
-        mod.SetWorldIconColor(this.behaviorWI, CoreUI_Colors.BlueDark)
         mod.SetWorldIconOwner(this.behaviorWI, receiver)
 
         let i = 1
@@ -2500,20 +2499,7 @@ export class CoreAI_DebugWI {
 
             this.memoryWIs.set(key, wi)
             i++
-            /* console.log(
-                'memory key: ',
-                key,
-                'value: ',
-                this.brain.memory.data[key],
-                'remaining: ',
-                this.brain.memory.getTimeRemaining(key)
-            ) */
         }
-
-        /* this.calm = { index: 3, worldIcon: this.spawn_wi(player) }
-        this.battle = { index: 2, worldIcon: this.spawn_wi(player) }
-        this.stats = { index: 1, worldIcon: this.spawn_wi(player) }
-        this.behavior = { index: 0, worldIcon: this.spawn_wi(player) } */
 
         this.roamPosWI = mod.SpawnObject(
             mod.RuntimeSpawn_Common.WorldIcon,
@@ -2521,9 +2507,9 @@ export class CoreAI_DebugWI {
             mod.CreateVector(0, 0, 0)
         )
         mod.SetWorldIconOwner(this.roamPosWI, receiver)
-        mod.SetWorldIconImage(this.roamPosWI, mod.WorldIconImages.Skull)
+        mod.SetWorldIconImage(this.roamPosWI, mod.WorldIconImages.Flag)
         mod.EnableWorldIconImage(this.roamPosWI, true)
-        mod.SetWorldIconColor(this.roamPosWI, CoreUI_Colors.YellowDark)
+        mod.SetWorldIconColor(this.roamPosWI, mod.CreateVector(0, 1, 1))
 
         this.vehicleToDriveWI = mod.SpawnObject(
             mod.RuntimeSpawn_Common.WorldIcon,
@@ -2531,9 +2517,9 @@ export class CoreAI_DebugWI {
             mod.CreateVector(0, 0, 0)
         )
         mod.SetWorldIconOwner(this.vehicleToDriveWI, receiver)
-        mod.SetWorldIconImage(this.vehicleToDriveWI, mod.WorldIconImages.Skull)
+        mod.SetWorldIconImage(this.vehicleToDriveWI, mod.WorldIconImages.Assist)
         mod.EnableWorldIconImage(this.vehicleToDriveWI, true)
-        mod.SetWorldIconColor(this.vehicleToDriveWI, CoreUI_Colors.BlueDark)
+        mod.SetWorldIconColor(this.vehicleToDriveWI, mod.CreateVector(1, 1, 0))
     }
 
     update() {
@@ -2541,6 +2527,9 @@ export class CoreAI_DebugWI {
             mod.IsPlayerValid(this.brain.player) &&
             mod.GetSoldierState(this.brain.player, mod.SoldierStateBool.IsAlive)
 
+        /**
+         * Behavior
+         */
         if (isValid) {
             mod.EnableWorldIconText(this.behaviorWI, true)
             mod.SetWorldIconPosition(
@@ -2577,6 +2566,9 @@ export class CoreAI_DebugWI {
             mod.EnableWorldIconText(this.behaviorWI, false)
         }
 
+        /**
+         * Memory
+         */
         let i = 1
         for (const [key, wi] of this.memoryWIs) {
             if (!isValid) {
@@ -2588,7 +2580,7 @@ export class CoreAI_DebugWI {
                 wi,
                 this.brain.memory.getTimeRemaining(key) === 0
                     ? mod.CreateVector(1, 1, 1)
-                    : CoreUI_Colors.YellowDark
+                    : mod.CreateVector(1, 1, 0)
             )
             mod.EnableWorldIconText(wi, true)
             mod.SetWorldIconPosition(
@@ -2618,6 +2610,9 @@ export class CoreAI_DebugWI {
             i++
         }
 
+        /**
+         * Roam navigation
+         */
         if (this.brain.memory.get('roamPos')) {
             mod.SetWorldIconPosition(
                 this.roamPosWI,
@@ -2634,6 +2629,9 @@ export class CoreAI_DebugWI {
             mod.EnableWorldIconText(this.roamPosWI, false)
         }
 
+        /**
+         * Vehicle to Drive navigation
+         */
         if (this.brain.memory.get('vehicleToDrive')) {
             mod.SetWorldIconPosition(
                 this.vehicleToDriveWI,
@@ -2709,40 +2707,6 @@ export class CoreAI_DebugWI {
 
         // Each stacked icon sits on top of the previous one
         return baseOffset + index * gap * scale
-    }
-
-    private spawn_wi(receiver: mod.Player): mod.WorldIcon {
-        const wi = mod.SpawnObject(
-            mod.RuntimeSpawn_Common.WorldIcon,
-            mod.CreateVector(0, 0, 0),
-            mod.CreateVector(0, 0, 0)
-        )
-        mod.SetWorldIconOwner(wi, receiver)
-        // mod.SetWorldIconColor(wi, mod.CreateVector(1, 1, 1))
-        // mod.SetWorldIconText(wi, mod.Message(''))
-        // mod.EnableWorldIconText(wi, true)
-
-        return wi
-    }
-
-    private update_wi(wi: CoreAI_IDebugWI, mes: mod.Message): void {
-        mod.SetWorldIconPosition(
-            wi.worldIcon,
-            mod.CreateVector(
-                mod.XComponentOf(mod.GetObjectPosition(this.brain.player)),
-                mod.YComponentOf(mod.GetObjectPosition(this.brain.player)) +
-                    this.getStackedIconOffset(
-                        mod.DistanceBetween(
-                            mod.GetObjectPosition(this.brain.player),
-                            mod.GetObjectPosition(this.receiver)
-                        ),
-                        wi.index,
-                        0.6
-                    ),
-                mod.ZComponentOf(mod.GetObjectPosition(this.brain.player))
-            )
-        )
-        mod.SetWorldIconText(wi.worldIcon, mes)
     }
 }
 
@@ -4425,6 +4389,71 @@ export class PlayerManager extends CorePlayer_APlayerManager {
     }
 }
 
+// -------- FILE: src\GameModes\Playground\Services\CapturePointTimeService.ts --------
+export class CapturePointTimeService
+    implements CorePlayer_IGameModeEngineEvents
+{
+    private readonly captureProgressMap = new Map<
+        number,
+        {
+            captureProgress: number
+            isCapturing: boolean | null
+        }
+    >()
+
+    constructor(
+        private readonly gameMode: PG_GameMode,
+        private readonly time: number = 3
+    ) {
+        this.gameMode.addListener(this)
+    }
+
+    OngoingCapturePoint(eventCapturePoint: mod.CapturePoint): void {
+        const captureProgress = mod.GetCaptureProgress(eventCapturePoint)
+
+        if (captureProgress === 0 || captureProgress === 1) {
+            return
+        }
+
+        const capturePointId = mod.GetObjId(eventCapturePoint)
+
+        const captureProgressMapEntry =
+            this.captureProgressMap.get(capturePointId)
+
+        if (!captureProgressMapEntry) {
+            this.captureProgressMap.set(capturePointId, {
+                captureProgress,
+                isCapturing: null,
+            })
+        }
+
+        if (captureProgress < captureProgressMapEntry!.captureProgress) {
+            // Neutralization
+            if (captureProgressMapEntry?.isCapturing !== false) {
+                mod.SetCapturePointNeutralizationTime(
+                    eventCapturePoint,
+                    this.time
+                )
+            }
+
+            this.captureProgressMap.set(capturePointId, {
+                captureProgress,
+                isCapturing: false,
+            })
+        } else {
+            // Capturing
+            if (captureProgressMapEntry?.isCapturing !== true) {
+                mod.SetCapturePointCapturingTime(eventCapturePoint, this.time)
+            }
+
+            this.captureProgressMap.set(capturePointId, {
+                captureProgress,
+                isCapturing: true,
+            })
+        }
+    }
+}
+
 // -------- FILE: src\GameModes\Playground\PG_GameMode.ts --------
 export class PG_GameMode extends Core_AGameMode {
     protected override createPlayerManager(): CorePlayer_APlayerManager {
@@ -4433,7 +4462,7 @@ export class PG_GameMode extends Core_AGameMode {
 
     private AI_UNSPAWN_DELAY = 10
     private AI_COUNT_TEAM_1 = 1
-    private AI_COUNT_TEAM_2 = 2
+    private AI_COUNT_TEAM_2 = 0
 
     private squadManager: Core_SquadManager | null = null
 
@@ -4473,6 +4502,8 @@ export class PG_GameMode extends Core_AGameMode {
         // mod.SetAIToHumanDamageModifier(2)
         mod.SetFriendlyFire(true)
 
+        new CapturePointTimeService(this, 5)
+
         // Spawn initial logical bots
         for (let i = 1; i <= this.AI_COUNT_TEAM_1; i++) {
             mod.Wait(1).then(() =>
@@ -4503,14 +4534,6 @@ export class PG_GameMode extends Core_AGameMode {
      *
      */
 
-    protected override OnVehicleSpawned(eventVehicle: mod.Vehicle): void {
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(666))
-    }
-
-    /*
-     *
-     */
-
     protected override async OnLogicalPlayerJoinGame(
         lp: CorePlayer_APlayer
     ): Promise<void> {
@@ -4524,7 +4547,7 @@ export class PG_GameMode extends Core_AGameMode {
             const brain = new CoreAI_Brain(
                 lp.player,
                 PG_GameMode.infantryProfile,
-                false
+                true
             )
 
             lp.addComponent(new CoreAI_BrainComponent(brain))
