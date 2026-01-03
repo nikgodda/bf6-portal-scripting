@@ -3057,8 +3057,8 @@ export class CoreAI_Brain {
      * ------------------------------------------------------------ */
 
     onMoveFinished(success: boolean): void {
-        /* this.memory.set('roamPos', null)
-        this.emit('OnMoveFinished', success) */
+        this.memory.set('roamPos', null)
+        this.emit('OnMoveFinished', success)
     }
 
     /* ------------------------------------------------------------

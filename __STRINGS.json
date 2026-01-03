@@ -16,7 +16,8 @@
             "vehicleToDrive": "vehicleToDrive: {}",
             "isInBattle": "isInBattle: {}",
             "roamPos": "roamPos: {}",
-            "arrivedPos": "arrivedPos: {}"
+            "arrivedPos": "arrivedPos: {}",
+            "capturePoint": "capturePoint: {}"
           }
         }
       },
