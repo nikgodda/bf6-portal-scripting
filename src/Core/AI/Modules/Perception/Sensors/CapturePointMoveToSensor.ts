@@ -1,5 +1,5 @@
-import { CoreAI_ASensor } from '../ASensor'
-import { CoreAI_SensorContext } from '../SensorContext'
+import { CoreAI_ASensor } from './ASensor'
+import { CoreAI_SensorContext } from './SensorContext'
 
 /**
  * MoveToCapturePointSensor

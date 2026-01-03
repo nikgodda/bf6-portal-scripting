@@ -1,5 +1,5 @@
-import { CoreAI_ASensor } from '../ASensor'
-import { CoreAI_SensorContext } from '../SensorContext'
+import { CoreAI_ASensor } from './ASensor'
+import { CoreAI_SensorContext } from './SensorContext'
 
 /**
  * RoamSensor:
@@ -11,11 +11,7 @@ import { CoreAI_SensorContext } from '../SensorContext'
  * - Velocity is preferred when speed > threshold.
  * - Intent direction stabilizes steering across replans.
  */
-<<<<<<<< HEAD:src/Core/AI/Modules/Perception/Sensors/MoveTo/OnfootMoveToSensor.ts
-export class CoreAI_OnfootMoveToSensor extends CoreAI_ASensor {
-========
 export class CoreAI_RoamSensor extends CoreAI_ASensor {
->>>>>>>> playground:src/Core/AI/Modules/Perception/Sensors/RoamSensor.ts
     private readonly ttlMs: number
 
     private coldStart: boolean = true
@@ -45,9 +41,6 @@ export class CoreAI_RoamSensor extends CoreAI_ASensor {
 
         const player = ctx.player
         if (!mod.IsPlayerValid(player)) return
-        if (mod.GetSoldierState(player, mod.SoldierStateBool.IsInVehicle)) {
-            return
-        }
 
         const points = this.getPoints()
         if (!points || points.length === 0) return

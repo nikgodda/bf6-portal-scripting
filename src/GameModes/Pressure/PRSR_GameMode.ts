@@ -218,18 +218,16 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
         const captureProgressMapEntry =
             this.captureProgressMap.get(capturePointId)
 
-        const entry = captureProgressMapEntry ?? {
-            captureProgress,
-            isCapturing: true,
-        }
-
         if (!captureProgressMapEntry) {
-            this.captureProgressMap.set(capturePointId, entry)
+            this.captureProgressMap.set(capturePointId, {
+                captureProgress,
+                isCapturing: true,
+            })
         }
 
-        if (captureProgress < entry.captureProgress) {
+        if (captureProgress < captureProgressMapEntry!.captureProgress) {
             // Neutralization
-            if (entry.isCapturing) {
+            if (captureProgressMapEntry?.isCapturing) {
                 mod.SetCapturePointNeutralizationTime(
                     eventCapturePoint,
                     this.CAPTURE_POINT_TIME
@@ -242,7 +240,7 @@ export class PRSR_GameMode extends Core_AGameMode<IGameModeEvents> {
             })
         } else {
             // Capturing
-            if (!entry.isCapturing) {
+            if (!captureProgressMapEntry?.isCapturing) {
                 mod.SetCapturePointCapturingTime(
                     eventCapturePoint,
                     this.CAPTURE_POINT_TIME
